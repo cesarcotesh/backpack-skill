@@ -4,6 +4,7 @@ import sys
 
 from .audit import build_audit, write_audit
 from .inventory import build_inventory, write_inventory
+from .manual import build_manual, write_manual
 from .scanner import scan_inventory, write_scan
 from .usage import build_usage, write_usage
 
@@ -30,7 +31,23 @@ def main(argv=None):
     use.add_argument("--home", required=True, help="Carpeta que contiene .claude.")
     use.add_argument("--app-data", help="Carpeta de datos de la app de escritorio de Claude, para incluir sus sesiones.")
     use.add_argument("--out", default="out", help="Carpeta donde se guarda usage.json.")
+    man = sub.add_parser("manual", help="Arma una ficha por skill y las recetas, y genera manual.json.")
+    man.add_argument("--inventory", default="out/inventory.json", help="Ruta de inventory.json.")
+    man.add_argument("--scan", default="out/scan.json", help="Ruta de scan.json.")
+    man.add_argument("--audit", default="out/audit.json", help="Ruta de audit.json.")
+    man.add_argument("--out", default="out", help="Carpeta donde se guarda manual.json.")
     args = parser.parse_args(argv)
+
+    if args.command == "manual":
+        loaded = []
+        for p in (args.inventory, args.scan, args.audit):
+            with open(p, encoding="utf-8") as f:
+                loaded.append(json.load(f))
+        result = build_manual(*loaded)
+        path = write_manual(result, args.out)
+        print(f"Manual listo: {len(result['cards'])} fichas y {len(result['recipes'])} recetas.")
+        print(f"Guardado en {path}")
+        return 0
 
     if args.command == "usage":
         result = build_usage(args.home, args.app_data)
