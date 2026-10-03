@@ -2,4 +2,4 @@
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "skills" / "audit"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "plugins" / "backpack-skill" / "skills" / "audit"))

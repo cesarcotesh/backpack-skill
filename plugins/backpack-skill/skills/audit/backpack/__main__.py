@@ -1,18 +1,76 @@
 import argparse
 import json
+import os
 import sys
+import webbrowser
+from pathlib import Path
 
 from .app import build_app, write_app
-from .audit import build_audit, write_audit
-from .inventory import build_inventory, write_inventory
-from .manual import build_manual, write_manual
+from .audit import _n, build_audit, write_audit
+from .inventory import build_inventory, find_app_data, write_inventory
+from .manual import build_manual, shortlist, write_manual
 from .scanner import scan_inventory, write_scan
 from .usage import build_usage, write_usage
 
 
+def default_out():
+    """The plugin's own data folder when installed as a plugin, else ~/.backpack-skill."""
+    return Path(os.environ.get("CLAUDE_PLUGIN_DATA") or Path.home() / ".backpack-skill")
+
+
+def load_notes(folder):
+    """Claude's explanations (explanations.json), if it wrote them; never required."""
+    path = Path(folder) / "explanations.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+    except (OSError, ValueError):
+        print("No se pudo leer explanations.json; la interfaz sale sin explicaciones de Claude.")
+        return None
+
+
+def run(args):
+    out = Path(args.out) if args.out else default_out()
+    app_data = {"auto": lambda: find_app_data(args.home), "none": lambda: None}.get(args.app_data, lambda: args.app_data)()
+    if args.project is None:  # the current folder counts as a project when it has its own .claude
+        here = Path.cwd()
+        projects = [here] if (here / ".claude").is_dir() and here.resolve() != Path(args.home).resolve() else []
+    else:
+        projects = args.project
+    inventory = build_inventory(args.home, projects, app_data)
+    scan = scan_inventory(inventory)
+    usage = build_usage(args.home, app_data)
+    audit = build_audit(inventory, scan, usage)
+    manual = build_manual(inventory, scan, audit)
+    for write, data in ((write_inventory, inventory), (write_scan, scan), (write_usage, usage),
+                        (write_audit, audit), (write_manual, manual)):
+        write(data, out)
+    (out / "shortlist.json").write_text(json.dumps(shortlist(inventory, audit, manual), ensure_ascii=False, indent=2),
+                                        encoding="utf-8")
+    path = write_app(build_app(inventory, scan, audit, manual, load_notes(out)), out)
+    t = audit["totals"]
+    print(f"Revisé {t['skills']} skills{' (incluye la app de escritorio)' if app_data else ''}.")
+    print(f"Carga fija: ~{_n(t['fixed_tokens'])} tokens por conversación (estimado).")
+    print(f"Sugerencias: {t['lights']['orange']} para quitar, {t['lights']['mustard']} para revisar, "
+          f"{t['lights']['green']} para conservar. Quitando lo sugerido: ~{_n(t['fixed_tokens_after_removals'])} tokens.")
+    print(f"Riesgo alto en {scan['totals']['high']} skills y {scan['plugin_totals']['high']} plugins. {scan['disclaimer']}")
+    print(f"Interfaz: {path}")
+    print(f"Lista para explicar: {out / 'shortlist.json'}")
+    if not args.no_open:
+        webbrowser.open(path.resolve().as_uri())
+    return 0
+
+
 def main(argv=None):
+    if hasattr(sys.stdout, "reconfigure"):  # Spanish text through pipes on Windows
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(prog="python -m backpack", description="Revisa las skills instaladas de Claude.")
     sub = parser.add_subparsers(dest="command", required=True)
+    go = sub.add_parser("run", help="Hace todo: revisa tus skills, arma la interfaz y la abre.")
+    go.add_argument("--home", default=str(Path.home()), help="Carpeta que contiene .claude. Por defecto, tu carpeta de usuario.")
+    go.add_argument("--app-data", default="auto", help="Carpeta de la app de escritorio de Claude, 'auto' para buscarla o 'none'.")
+    go.add_argument("--project", action="append", help="Carpeta de un proyecto. Por defecto, la carpeta actual si tiene .claude.")
+    go.add_argument("--out", help="Carpeta de salida. Por defecto, la del plugin o ~/.backpack-skill.")
+    go.add_argument("--no-open", action="store_true", help="No abrir la interfaz al terminar.")
     inv = sub.add_parser("inventory", help="Genera inventory.json con las skills encontradas.")
     # --home is required on purpose: nothing reads the real ~/.claude unless asked explicitly
     inv.add_argument("--home", required=True, help="Carpeta que contiene .claude (por ejemplo, tu carpeta de usuario).")
@@ -40,15 +98,22 @@ def main(argv=None):
     ui = sub.add_parser("app", help="Arma la interfaz: un único archivo mochila.html con todo adentro.")
     ui.add_argument("--data", default="out", help="Carpeta con inventory, scan, audit y manual (.json).")
     ui.add_argument("--out", default="out", help="Carpeta donde se guarda mochila.html.")
+    ui.add_argument("--open", action="store_true", help="Abrir la interfaz al terminar.")
     args = parser.parse_args(argv)
+
+    if args.command == "run":
+        return run(args)
 
     if args.command == "app":
         loaded = []
         for name in ("inventory", "scan", "audit", "manual"):
             with open(f"{args.data}/{name}.json", encoding="utf-8") as f:
                 loaded.append(json.load(f))
-        path = write_app(build_app(*loaded), args.out)
-        print(f"Interfaz lista: ábrela con doble clic, sin conexión. Guardada en {path}")
+        notes = load_notes(args.data)
+        path = write_app(build_app(*loaded, notes=notes), args.out)
+        print(f"Interfaz lista{' con explicaciones de Claude' if notes else ''}: ábrela con doble clic, sin conexión. Guardada en {path}")
+        if args.open:
+            webbrowser.open(path.resolve().as_uri())
         return 0
 
     if args.command == "manual":

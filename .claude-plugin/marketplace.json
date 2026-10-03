@@ -1,0 +1,15 @@
+{
+  "name": "backpack-skill",
+  "owner": { "name": "Cayeyewarrior" },
+  "metadata": {
+    "description": "Backpack Skill: revisa, explica y ayuda a limpiar las skills de Claude."
+  },
+  "plugins": [
+    {
+      "name": "backpack-skill",
+      "source": "./plugins/backpack-skill",
+      "description": "Revisa, explica y ayuda a limpiar tus skills de Claude: peso en tokens, copias, skills sin uso, choques y seguridad, en una app visual. Solo lectura.",
+      "skills": ["./skills/audit"]
+    }
+  ]
+}

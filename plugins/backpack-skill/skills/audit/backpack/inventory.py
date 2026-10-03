@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import re
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -254,8 +255,8 @@ def installed_plugin_roots(plugins_dir, warnings):
         for pid, entries in data["plugins"].items():
             for entry in entries if isinstance(entries, list) else [entries]:
                 if isinstance(entry, dict) and entry.get("installPath"):
-                    roots.setdefault(fs_path(entry["installPath"]), pid)
-        return sorted((pid, path) for path, pid in roots.items())
+                    roots.setdefault(fs_path(entry["installPath"]), (pid, entry.get("scope")))
+        return sorted((pid, path, scope) for path, (pid, scope) in roots.items())
     # ponytail: no install record, so take the last version dir by name per plugin
     out = []
     cache = plugins_dir / "cache"
@@ -263,8 +264,25 @@ def installed_plugin_roots(plugins_dir, warnings):
         for plug in sorted(mkt.iterdir()) if mkt.is_dir() else []:
             versions = sorted(v for v in plug.iterdir() if v.is_dir()) if plug.is_dir() else []
             if versions:
-                out.append((f"{plug.name}@{mkt.name}", versions[-1]))
+                out.append((f"{plug.name}@{mkt.name}", versions[-1], None))
     return out
+
+
+def find_app_data(home=None):
+    """The Claude desktop app's data folder, or None.
+    Microsoft Store installs keep the real files under Packages; other Store apps
+    (like Store Python) don't see the virtualized %APPDATA%\\Claude."""
+    home = Path(home or Path.home())
+    candidates = []
+    if os.name == "nt":
+        local = Path(os.environ.get("LOCALAPPDATA") or home / "AppData" / "Local")
+        candidates += sorted(local.glob("Packages/Claude_*/LocalCache/Roaming/Claude"))
+        candidates.append(Path(os.environ.get("APPDATA") or home / "AppData" / "Roaming") / "Claude")
+    elif sys.platform == "darwin":
+        candidates.append(home / "Library" / "Application Support" / "Claude")
+    else:
+        candidates.append(Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config") / "Claude")
+    return next((c for c in candidates if (c / "local-agent-mode-sessions").is_dir()), None)
 
 
 def plugin_skills(root, plugin_id, marketplace, enabled_map, warnings, via=None):
@@ -341,13 +359,14 @@ def build_inventory(home, projects=(), app_data=None):
             found += [(d, n, "plugin", plug["id"], plug, None)
                       for d, n, plug in plugin_skills(pdir, None, "skills-dir", enabled_map, warnings)]
 
-    for pid, root in installed_plugin_roots(home / ".claude" / "plugins", warnings):
+    for pid, root, install_scope in installed_plugin_roots(home / ".claude" / "plugins", warnings):
         if not root.is_dir():
             _warn(warnings, root, "plugin_missing", f"El plugin {pid} está registrado pero su carpeta no existe.")
             continue
         mkt = pid.split("@", 1)[1] if "@" in pid else None
-        found += [(d, n, "plugin", pid, plug, None)
-                  for d, n, plug in plugin_skills(root, pid, mkt, enabled_map, warnings)]
+        for d, n, plug in plugin_skills(root, pid, mkt, enabled_map, warnings):
+            plug["install_scope"] = install_scope  # user, project or local: uninstalling needs it
+            found.append((d, n, "plugin", pid, plug, None))
 
     if app_data:
         found += [(d, n, "plugin", plug["id"], plug, on) for d, n, plug, on in app_skills(app_data, enabled_map, warnings)]

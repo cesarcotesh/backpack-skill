@@ -549,29 +549,53 @@ function screenManual(focus) {
     focused ? h("a", { href: "#manual", class: "small bold" }, "← Todas las recetas") : null, body];
 }
 
+let done = store.get("done", {});  // uninstall steps the person already did
+function codeLine(text) {
+  const copy = h("button", { type: "button", class: "chip", onclick: () => copyText(text, copy) }, "Copiar");
+  return h("div", { class: "note", style: "display:flex;align-items:center;gap:10px;padding:10px 12px" },
+    h("span", { class: "mono small grow", style: "overflow-wrap:anywhere" }, text), copy);
+}
 function screenChanges() {
   const remove = [], keep = [];
   for (const [key, v] of Object.entries(marks)) {
     const item = key.startsWith("P:") ? PL.get(key.slice(2)) : SK.get(key);
     if (!item) continue;
-    (v === "remove" ? remove : keep).push({ key, label: key.startsWith("P:") ? `Plugin ${item.name}` : item.command, origin: item.origin, fixed: item.fixed });
+    (v === "remove" ? remove : keep).push({ key, label: key.startsWith("P:") ? `Plugin ${item.name}` : item.command,
+      origin: item.origin, fixed: item.fixed, guide: item.guide });
   }
   remove.sort((a, b) => b.fixed - a.fixed);
   const freed = remove.reduce((t, x) => t + x.fixed, 0);
-  const undo = key => { delete marks[key]; saveMarks(); route(); };
-  const list = items => h("div", { class: "stack" }, items.map(x => h("div", { class: "row" },
-    h("span", { class: "grow" }, h("span", { class: "mono", style: "overflow-wrap:anywhere" }, x.label), h("span", { class: "small muted" }, `${x.origin} · ~${fmt(x.fixed)} tokens fijos`)),
-    h("button", { type: "button", class: "chip", onclick: () => undo(x.key) }, "Deshacer"))));
-  const text = remove.length ? "Quiero quitar estas skills y plugins:\n" + remove.map(x => `- ${x.label} (${x.origin})`).join("\n") : "";
+  const undo = key => { delete marks[key]; delete done[key]; saveMarks(); store.set("done", done); route(); };
+  const tick = (key, on) => { if (on) done[key] = true; else delete done[key]; store.set("done", done); route(); };
+  const head = x => h("span", { class: "grow" }, h("span", { class: "mono", style: "overflow-wrap:anywhere" }, x.label),
+    h("span", { class: "small muted" }, `${x.origin} · ~${fmt(x.fixed)} tokens fijos`));
+  const removeList = h("ol", { class: "stack", style: "margin:0;padding:0;list-style:none;gap:12px" }, remove.map(x => {
+    const g = x.guide || {}, id = "done-" + x.key.replace(/[^\w-]/g, "_");
+    return h("li", { class: "card stack", style: `background:var(--bg);gap:10px;${done[x.key] ? "opacity:.6" : ""}` },
+      h("div", { style: "display:flex;align-items:center;gap:12px" }, head(x),
+        h("button", { type: "button", class: "chip", onclick: () => undo(x.key) }, "Deshacer")),
+      g.how ? h("p", { class: "small" }, g.how) : null,
+      g.command ? codeLine(g.command) : null,
+      g.path ? codeLine(g.path) : null,
+      h("label", { for: id, style: "display:flex;align-items:center;gap:10px;min-height:44px;font-weight:700" },
+        h("input", { type: "checkbox", id, checked: !!done[x.key], style: "width:22px;height:22px",
+          onchange: e => tick(x.key, e.target.checked) }), "Ya lo quité"));
+  }));
+  const pending = remove.filter(x => !done[x.key]);
+  const text = pending.length ? "Quiero quitar estas skills y plugins. Guíame paso a paso:\n" +
+    pending.map(x => `- ${x.label} (${x.origin})${x.guide && x.guide.command ? `: ${x.guide.command}` : ""}${x.guide && x.guide.path ? `: ${x.guide.path}` : ""}`).join("\n") : "";
   const copy = h("button", { type: "button", class: "btn primary", onclick: () => copyText(text, copy) }, icon("copy", 18), "Copiar la lista para Claude");
+  const list = items => h("div", { class: "stack" }, items.map(x => h("div", { class: "row" }, head(x),
+    h("button", { type: "button", class: "chip", onclick: () => undo(x.key) }, "Deshacer"))));
   return [topbar(), h("h1", null, "Cambios"),
-    h("p", { class: "note" }, "Todavía no se borra nada. Esta es tu lista; en el próximo paso te mostraremos cómo desinstalar cada cosa según su origen."),
+    h("p", { class: "note" }, "Nada se borra solo. Sigue los pasos de cada una y marca «Ya lo quité». Después vuelve a pedirle a Claude que revise tus skills para ver la mochila más liviana."),
     h("section", { class: "card stack", "aria-label": "Para quitar" }, h("h2", null, `Para quitar (${fmt(remove.length)})`),
-      remove.length ? [h("p", { class: "bold" }, `Liberarías ~${fmt(freed)} tokens en cada conversación (estimado).`), list(remove), h("div", { class: "wrap" }, copy)]
+      remove.length ? [h("p", { class: "bold" }, `Liberarías ~${fmt(freed)} tokens en cada conversación (estimado). Llevas ${fmt(remove.length - pending.length)} de ${fmt(remove.length)}.`),
+        removeList, pending.length ? h("div", { class: "wrap" }, copy) : null]
         : h("p", { class: "muted" }, "Aún no marcaste nada para quitar.")),
     h("section", { class: "card stack", "aria-label": "Para conservar" }, h("h2", null, `Para conservar (${fmt(keep.length)})`),
       keep.length ? list(keep) : h("p", { class: "muted" }, "Aún no marcaste nada para conservar.")),
-    Object.keys(marks).length ? h("button", { type: "button", class: "btn", onclick: () => { if (confirm("¿Borrar todas tus marcas?")) { marks = {}; saveMarks(); route(); } } }, "Empezar de cero") : null];
+    Object.keys(marks).length ? h("button", { type: "button", class: "btn", onclick: () => { if (confirm("¿Borrar todas tus marcas?")) { marks = {}; done = {}; saveMarks(); store.set("done", done); route(); } } }, "Empezar de cero") : null];
 }
 
 function copyText(text, button) {

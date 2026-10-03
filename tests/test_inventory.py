@@ -11,7 +11,7 @@ from pathlib import Path
 from backpack.inventory import LISTING_CAP, build_inventory, estimate_tokens, fs_path, plain, write_inventory
 
 FIXTURES = Path(__file__).parent / "fixtures"
-PACKAGE = Path(__file__).parent.parent / "skills" / "audit" / "backpack"
+PACKAGE = Path(__file__).parent.parent / "plugins" / "backpack-skill" / "skills" / "audit" / "backpack"
 
 
 def tree_hash(root):

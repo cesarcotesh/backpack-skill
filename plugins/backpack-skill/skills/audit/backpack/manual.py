@@ -180,6 +180,23 @@ def build_manual(inventory, scan, audit):
     }
 
 
+def shortlist(inventory, audit, manual, limit=40):
+    """Skills worth a plain-language note from Claude: the ones that stay or need a look
+    (not the ones to remove). Skill text goes out marked as data for Claude to explain."""
+    keep = [s for s in inventory["skills"] if audit["skills"][s["id"]]["recommendation"] != "remove"]
+    used = lambda s: (audit["skills"][s["id"]].get("usage") or {}).get("count", 0)
+    keep.sort(key=lambda s: (-used(s), -s["tokens"]["fixed"], s["id"]))
+    return [{
+        "id": s["id"],
+        "command": s["command"],
+        "recommendation": audit["skills"][s["id"]]["recommendation"],
+        "reasons": [r["text"] for r in audit["skills"][s["id"]]["reasons"]],
+        "needs": manual["cards"][s["id"]]["needs"],
+        "usage": manual["cards"][s["id"]]["usage"],
+        "skill_text_untrusted": s["description"][:600],
+    } for s in keep[:limit]]
+
+
 def write_manual(manual, out_dir):
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

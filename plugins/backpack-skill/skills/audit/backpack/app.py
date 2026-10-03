@@ -9,9 +9,11 @@ page falls back to system fonts.
 """
 import base64
 import json
+import re
 from pathlib import Path
 
 from .audit import STOPWORDS
+from .inventory import plain
 
 TEMPLATE = Path(__file__).with_name("app_template.html")
 FONTS_DIR = Path(__file__).parent / "assets" / "fonts"
@@ -37,7 +39,60 @@ def origin_label(skill):
     return labels.get(o["type"], f"Carpeta {scope}, origen desconocido")
 
 
-def build_payload(inventory, scan, audit, manual):
+def home_path(path, home):
+    """'~/…' form: no user name on the page, and it still works in a terminal."""
+    p = plain(path).replace("\\", "/")
+    for base in (home, Path.home()):  # a project can live outside the analyzed home but inside yours
+        h = plain(base).replace("\\", "/").rstrip("/")
+        if p.lower().startswith(h.lower() + "/"):
+            return "~" + p[len(h):]
+    return p
+
+
+def guide(skill, home):
+    """How to uninstall, by origin (sources: Claude Code plugin CLI docs, claude.ai and Claude
+    help center, vercel-labs/skills README). The MVP only guides; it never deletes."""
+    o, plugin = skill["origin"], skill.get("plugin") or {}
+    folder = home_path(Path(plain(skill["path"])).parent, home)
+    if o["type"] == "claude.ai":
+        return {"how": f"En claude.ai abre Customize > Skills y desactiva «{skill['name']}». "
+                       "Si la subiste tú y ya no la quieres, bórrala desde su menú (…).", "command": None}
+    if o["type"] == "plugin" and o.get("via") == "app":
+        return {"how": f"En la app de Claude abre Customize > Plugins, busca «{plugin['name']}» y quítalo desde su menú (…). "
+                       "Se guarda en tu cuenta, así que deja de cargarse en todos tus dispositivos.", "command": None}
+    if o["type"] == "plugin" and plugin.get("marketplace") == "skills-dir":
+        return {"how": "Es un plugin guardado como carpeta. Mueve esta carpeta a la papelera:",
+                "command": None, "path": home_path(plugin["root"], home)}
+    if o["type"] == "plugin":
+        scope = plugin.get("install_scope")
+        flag = f" --scope {scope}" if scope in ("project", "local") else ""
+        return {"how": "Ejecuta este comando en una terminal, o escribe /plugin en Claude Code y quítalo desde la pestaña Installed.",
+                "command": f"claude plugin uninstall {plugin['id']}{flag}"}
+    if o["type"] == "npx-skills":
+        where = "--global " if skill["scope"] == "personal" else ""
+        return {"how": "Se instaló con npx skills; quítala con el mismo programa:",
+                "command": f"npx skills remove {where}{Path(plain(skill['path'])).parent.name}"}
+    if o["type"] == "symlink":
+        return {"how": "Es un enlace a otra carpeta. Borra solo el enlace; la carpeta original queda donde está:",
+                "command": None, "path": folder}
+    return {"how": "Mueve esta carpeta a la papelera (así puedes recuperarla si la necesitas):", "command": None, "path": folder}
+
+
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f​-‏‪-‮⁠-⁤⁦-⁩]")
+
+
+def clean_notes(notes, ids, limit=600):
+    """Claude's explanations, kept only for known skills, as short plain text."""
+    out = {}
+    for sid, text in (notes or {}).items() if isinstance(notes, dict) else []:
+        if sid in ids and isinstance(text, str) and text.strip():
+            out[sid] = _CONTROL.sub(" ", text.strip())[:limit]
+    return out
+
+
+def build_payload(inventory, scan, audit, manual, notes=None):
+    home = inventory.get("sources", {}).get("home", "")
+    notes = clean_notes(notes, {s["id"] for s in inventory["skills"]})
     skills = []
     for s in inventory["skills"]:
         a, c = audit["skills"][s["id"]], manual["cards"][s["id"]]
@@ -60,18 +115,22 @@ def build_payload(inventory, scan, audit, manual):
             "body": s["tokens"]["body"],
             "usage": a.get("usage"),
             "risk": scan.get("skills", {}).get(s["id"], {}).get("risk", "none"),
-            "card": {k: c[k] for k in ("what", "activation", "how_to_call", "needs", "when_not",
-                                        "usage", "weight", "risk", "recipes", "claude_note")},
+            "card": {**{k: c[k] for k in ("what", "activation", "how_to_call", "needs", "when_not",
+                                           "usage", "weight", "risk", "recipes")},
+                     "claude_note": notes.get(s["id"]) or c.get("claude_note")},
+            "guide": None if whole_plugin else guide(s, home),
         })
     plugins = []
-    origins = {s["plugin"]["id"]: origin_label(s) for s in inventory["skills"]
-               if s.get("plugin") and s["origin"]["type"] != "claude.ai"}
+    first = {}
+    for s in inventory["skills"]:
+        if s.get("plugin") and s["origin"]["type"] != "claude.ai":
+            first.setdefault(s["plugin"]["id"], s)
     for pid, p in audit.get("plugins", {}).items():
-        if pid not in origins:
+        if pid not in first:
             continue
-        plugins.append({"id": pid, "name": p["name"], "origin": origins.get(pid, ""), "light": p["light"],
+        plugins.append({"id": pid, "name": p["name"], "origin": origin_label(first[pid]), "light": p["light"],
                         "rec": p["recommendation"], "reasons": [r["text"] for r in p["reasons"]],
-                        "skills": p["skill_ids"], "fixed": p["fixed_tokens"]})
+                        "skills": p["skill_ids"], "fixed": p["fixed_tokens"], "guide": guide(first[pid], home)})
     return {
         "generated_at": audit["generated_at"],
         "totals": audit["totals"],
@@ -101,10 +160,10 @@ def embed_json(data):
     return text.replace("<", "\\u003c").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
 
 
-def build_app(inventory, scan, audit, manual, fonts_dir=FONTS_DIR):
+def build_app(inventory, scan, audit, manual, notes=None, fonts_dir=FONTS_DIR):
     html = TEMPLATE.read_text(encoding="utf-8")
     html = html.replace("/*__FONTS__*/", font_css(fonts_dir))
-    return html.replace("__BACKPACK_DATA__", embed_json(build_payload(inventory, scan, audit, manual)))
+    return html.replace("__BACKPACK_DATA__", embed_json(build_payload(inventory, scan, audit, manual, notes)))
 
 
 def write_app(html, out_dir):
