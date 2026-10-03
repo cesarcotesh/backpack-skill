@@ -1,4 +1,4 @@
-"""Milestone 6 acceptance tests. Run: python -m unittest discover tests"""
+"""Milestone 6 acceptance tests. Run: python -m unittest (from the repo root)"""
 import json
 import re
 import shutil

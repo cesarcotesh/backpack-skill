@@ -1,4 +1,4 @@
-"""Milestone 1 acceptance tests. Run: python -m unittest discover tests"""
+"""Milestone 1 acceptance tests. Run: python -m unittest (from the repo root)"""
 import ast
 import hashlib
 import json
@@ -11,7 +11,7 @@ from pathlib import Path
 from backpack.inventory import LISTING_CAP, build_inventory, estimate_tokens, fs_path, plain, write_inventory
 
 FIXTURES = Path(__file__).parent / "fixtures"
-PACKAGE = Path(__file__).parent.parent / "backpack"
+PACKAGE = Path(__file__).parent.parent / "skills" / "audit" / "backpack"
 
 
 def tree_hash(root):
