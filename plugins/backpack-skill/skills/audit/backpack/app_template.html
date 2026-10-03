@@ -99,6 +99,8 @@ td { padding: 6px 12px; border-bottom: 1px solid var(--line); vertical-align: mi
 td.num, th.num { text-align: right; white-space: nowrap; }
 tr.selected { background: var(--bg); }
 .linkish { min-height: 44px; padding: 0; border: none; background: transparent; text-align: left; cursor: pointer; }
+.th-sort { font-weight: 700; color: inherit; white-space: nowrap; }
+select.chip { padding: 0 10px; background: var(--surface); }
 input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 0 16px; border-radius: 26px; border: 1.5px solid var(--line); background: var(--surface); }
 ol.steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
 ol.steps li { display: flex; gap: 12px; align-items: flex-start; }
@@ -187,6 +189,7 @@ const TEXT = {
     recipesSkills: (r, n) => `${r} ${r === 1 ? "receta" : "recetas"} · ${n} skills`,
     youHaveRecipes: n => `Tienes ${fmt(n)} recetas: skills que se llaman entre sí. Busca por lo que quieres lograr.`,
     manualTitle: "Manual", whatDo: "¿Qué quieres hacer?", allRecipes: "← Todas las recetas", skillsTitle: "Skills",
+    sortBy: "Ordenar por", sortDesc: "De mayor a menor", sortAsc: "De menor a mayor", sortName: "Nombre",
     pluginLabel: name => `Plugin ${name}`, originTokens: (o, n) => `${o} · ~${fmt(n)} tokens fijos`,
     undo: "Deshacer", didIt: "Ya lo quité", claudeListIntro: "Quiero quitar estas skills y plugins. Guíame paso a paso:\n",
     copyForClaude: "Copiar la lista para Claude", changesTitle: "Cambios",
@@ -247,6 +250,7 @@ const TEXT = {
     recipesSkills: (r, n) => `${r} ${r === 1 ? "recipe" : "recipes"} · ${n} skills`,
     youHaveRecipes: n => `You have ${fmt(n)} recipes: skills that call each other. Search by what you want to get done.`,
     manualTitle: "Manual", whatDo: "What do you want to do?", allRecipes: "← All recipes", skillsTitle: "Skills",
+    sortBy: "Sort by", sortDesc: "High to low", sortAsc: "Low to high", sortName: "Name",
     pluginLabel: name => `Plugin ${name}`, originTokens: (o, n) => `${o} · ~${fmt(n)} fixed tokens`,
     undo: "Undo", didIt: "I removed it", claudeListIntro: "I want to remove these skills and plugins. Guide me step by step:\n",
     copyForClaude: "Copy the list for Claude", changesTitle: "Changes",
@@ -360,8 +364,14 @@ function navLinks(current, bottom) {
   return SECTIONS.map(([id, label, ic]) => h("a", { href: "#" + id, "aria-current": id === current ? "page" : null },
     bottom ? h("span", { class: "pill" }, icon(ic, 22)) : icon(ic, 20), label));
 }
+// the mode changes how Review looks, so switching it always lands on Review in that mode
+function toggleMode() {
+  advanced = !advanced;
+  store.set("advanced", advanced);
+  if (location.hash === "#revisar") route(); else location.hash = "#revisar";
+}
 function modeToggle() {
-  return h("button", { type: "button", class: "toggle", "aria-pressed": advanced, onclick: () => { advanced = !advanced; store.set("advanced", advanced); route(); } },
+  return h("button", { type: "button", class: "toggle", "aria-pressed": advanced, onclick: toggleMode },
     h("span", { class: "switch" }), advanced ? T.advanced : T.simple);
 }
 function topbar() { return h("div", { class: "topbar" }, h("span", { class: "wordmark" }, T.wordmark, h("span", null, ".")), modeToggle()); }
@@ -476,6 +486,45 @@ function pluginCard(p) {
 
 let selected = null, shown = 150;
 const WIDE = () => matchMedia("(min-width: 1280px)").matches;  // room for table + side card
+
+// --- table order: a "sort by" control plus clickable column headers, remembered per viewer
+let sortBy = store.get("sortBy", "fixed"), sortDesc = store.get("sortDesc", true);
+const REC_ORDER = { remove: 0, review: 1, merge: 2, tune: 3, keep: 4 };
+const SORTS = {  // key -> label and value per table (skill rows / plugin rows)
+  fixed: { label: () => T.fixedWeight, skill: s => s.fixed, plugin: p => p.fixed },
+  body: { label: () => T.whenActive, skill: s => s.body },
+  lastUse: { label: () => T.lastUse, skill: s => !s.usage ? -1 : s.usage.count ? s.usage.days_unused : Infinity },
+  name: { label: () => T.sortName, skill: s => s.command, plugin: p => p.name },
+  count: { label: () => T.thSkills, plugin: p => p.skills.length },
+  rec: { label: () => T.suggestion, skill: s => REC_ORDER[s.rec], plugin: p => REC_ORDER[p.rec] },
+};
+function sortRows(rows, kind) {
+  const key = SORTS[sortBy] && SORTS[sortBy][kind] ? sortBy : "fixed";
+  const value = SORTS[key][kind], dir = sortDesc ? -1 : 1;
+  return [...rows].sort((a, b) => {
+    const x = value(a), y = value(b);
+    return ((typeof x === "string" ? x.localeCompare(y) : x - y) || 0) * dir || a.id.localeCompare(b.id);
+  });
+}
+function setSort(key, desc) {
+  sortDesc = desc !== undefined ? desc : sortBy === key ? !sortDesc : key !== "name";  // names start A→Z
+  sortBy = key;
+  store.set("sortBy", sortBy); store.set("sortDesc", sortDesc); route();
+}
+function sortControl(kind) {
+  const select = h("select", { id: "sort-by", class: "chip", style: "min-height:40px", onchange: e => setSort(e.target.value, sortDesc) },
+    Object.entries(SORTS).filter(([, v]) => v[kind]).map(([k, v]) => h("option", { value: k, selected: k === sortBy }, v.label())));
+  return h("div", { class: "wrap", style: "gap:8px;align-items:center" },
+    h("label", { for: "sort-by", class: "small bold" }, T.sortBy), select,
+    h("button", { type: "button", class: "chip", "aria-label": sortDesc ? T.sortDesc : T.sortAsc, onclick: () => setSort(sortBy, !sortDesc) },
+      sortDesc ? `↓ ${T.sortDesc}` : `↑ ${T.sortAsc}`));
+}
+function th(label, key, cls) {  // a header that sorts by its column
+  if (!key) return h("th", { class: cls }, label);
+  const on = sortBy === key;
+  return h("th", { class: cls, "aria-sort": on ? (sortDesc ? "descending" : "ascending") : null },
+    h("button", { type: "button", class: "linkish th-sort", onclick: () => setSort(key) }, label, on ? (sortDesc ? " ↓" : " ↑") : ""));
+}
 function screenReviewTable(filterId) {
   const f = FILTERS.find(x => x[0] === filterId) || FILTERS[0];
   const t = D.totals;
@@ -492,19 +541,22 @@ function screenReviewTable(filterId) {
       h("div", { class: "small muted" }, t.usage_history_since ? T.since(t.usage_history_since) : T.noUsageData)),
     h("div", { class: "card stat" }, h("div", { class: "num" }, `~${fmt(t.savings)}`), h("div", { class: "bold" }, T.statFree), h("div", { class: "small muted" }, T.statFreeSub)));
   let table;
+  const kind = f[0] === "plugins" ? "plugin" : "skill";
   if (f[0] === "plugins") {
-    const rows = [...D.plugins].sort((a, b) => b.fixed - a.fixed);
-    table = h("table", null, h("thead", null, h("tr", null, h("th", null, T.thPlugin), h("th", null, T.thOrigin), h("th", { class: "num" }, T.thSkills), h("th", { class: "num" }, T.fixedWeight), h("th", null, T.suggestion), h("th", null, T.thDecision))),
-      h("tbody", null, rows.map(p => h("tr", null,
+    const rows = sortRows(D.plugins, "plugin");
+    table = h("table", null, h("thead", null, h("tr", null, th("#", null, "num"), th(T.thPlugin, "name"), th(T.thOrigin), th(T.thSkills, "count", "num"), th(T.fixedWeight, "fixed", "num"), th(T.suggestion, "rec"), th(T.thDecision))),
+      h("tbody", null, rows.map((p, i) => h("tr", null,
+        h("td", { class: "num muted" }, fmt(i + 1)),
         h("td", { class: "mono" }, p.name), h("td", { class: "muted" }, p.origin), h("td", { class: "num" }, fmt(p.skills.length)),
         h("td", { class: "num" }, `~${fmt(p.fixed)}`), h("td", { class: "bold" }, REC[p.rec], p.reasons.length ? h("div", { class: "tiny muted", style: "font-weight:400" }, p.reasons[0]) : null),
         h("td", null, decisionButtons("P:" + p.id))))));
   } else {
-    const rows = D.skills.filter(f[2]).sort((a, b) => b.fixed - a.fixed || a.id.localeCompare(b.id));
-    table = [h("table", null, h("thead", null, h("tr", null, h("th", null, T.thSkill), h("th", null, T.thReason), h("th", null, T.thOrigin), h("th", { class: "num" }, T.fixedWeight), h("th", { class: "num" }, T.whenActive), h("th", null, T.lastUse), h("th", null, T.suggestion))),
-      h("tbody", null, rows.slice(0, shown).map(s => {
+    const rows = sortRows(D.skills.filter(f[2]), "skill");
+    table = [h("table", null, h("thead", null, h("tr", null, th("#", null, "num"), th(T.thSkill, "name"), th(T.thReason), th(T.thOrigin), th(T.fixedWeight, "fixed", "num"), th(T.whenActive, "body", "num"), th(T.lastUse, "lastUse"), th(T.suggestion, "rec"))),
+      h("tbody", null, rows.slice(0, shown).map((s, i) => {
         const [label, cls] = motive(s);
         return h("tr", { class: s.id === selected ? "selected" : null },
+          h("td", { class: "num muted" }, fmt(i + 1)),
           h("td", null, h("button", { type: "button", class: "linkish mono", "aria-pressed": s.id === selected, onclick: () => selectSkill(s.id) }, s.command)),
           h("td", null, h("span", { class: `tag ${cls}` }, label)), h("td", { class: "muted" }, s.origin),
           h("td", { class: "num" }, `~${fmt(s.fixed)}`), h("td", { class: "num" }, `~${fmt(s.body)}`),
@@ -518,7 +570,7 @@ function screenReviewTable(filterId) {
     header, stats,
     h("div", { class: "split" },
       h("section", { class: "card main-col stack", "aria-label": T.skillsToReview, style: "gap:14px" },
-        h("h2", null, f[1]), chips, h("div", { class: "table-box" }, table)),
+        h("h2", null, f[1]), chips, sortControl(kind), h("div", { class: "table-box" }, table)),
       sel && WIDE() ? h("aside", { class: "card side-col stack", "aria-label": T.sheet, style: "gap:14px" }, fullCard(sel)) : null),
   ];
 }
@@ -742,7 +794,8 @@ function route() {
   const [name, arg] = (location.hash.slice(1) || "inicio").split("/");
   const current = SECTIONS.some(s => s[0] === name) ? name : "inicio";
   let view;
-  if (current === "revisar") view = (advanced || arg) ? screenReviewTable(arg) : screenReviewSimple();
+  if (current === "revisar" && arg && !advanced) { advanced = true; store.set("advanced", true); }  // filters live in advanced mode
+  if (current === "revisar") view = advanced ? screenReviewTable(arg) : screenReviewSimple();
   else if (current === "manual") view = screenManual(arg);
   else if (current === "simulador") view = screenSimulator();
   else if (current === "cambios") view = screenChanges();
