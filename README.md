@@ -11,14 +11,14 @@ Necesitas **Python 3.9 o superior**. Si no lo tienes, Claude te explica cómo in
 **Claude Code** (versión completa):
 
 ```
-/plugin marketplace add <usuario>/<repo>
+/plugin marketplace add cesarcotesh/backpack-skill
 /plugin install backpack-skill@backpack-skill
 ```
 
 **Otros agentes** (Cursor, Codex, Gemini CLI y más) con [skills](https://github.com/vercel-labs/skills):
 
 ```
-npx skills add <usuario>/<repo>
+npx skills add cesarcotesh/backpack-skill
 ```
 
 ## Usar
@@ -68,4 +68,4 @@ Comandos: `run`, `inventory`, `scan`, `usage`, `audit`, `manual` y `app`.
 
 ## Licencias
 
-Las tipografías incluidas (Bricolage Grotesque, Atkinson Hyperlegible e IBM Plex Mono) usan la SIL Open Font License 1.1; sus licencias están en `plugins/backpack-skill/skills/audit/backpack/assets/fonts/`. La licencia del proyecto (MIT o Apache-2.0) está por decidir.
+Las tipografías incluidas (Bricolage Grotesque, Atkinson Hyperlegible e IBM Plex Mono) usan la SIL Open Font License 1.1; sus licencias están en `plugins/backpack-skill/skills/audit/backpack/assets/fonts/`. El proyecto usa la licencia MIT (ver `LICENSE`).

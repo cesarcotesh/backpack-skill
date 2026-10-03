@@ -139,7 +139,7 @@ Un repositorio público en GitHub es la fuente única; el código abierto es par
 | Landing en Vercel | Manual y demo del dashboard con datos de ejemplo | Demo |
 | App de escritorio (fase 3) | Binarios firmados en GitHub Releases | Completa |
 
-- **Licencia:** MIT o Apache-2.0, por decidir.
+- **Licencia:** MIT.
 - **Catálogo curado (fase 2):** un JSON dentro del repo; la comunidad propone skills por pull request y la revisión queda pública.
 - **Instalación por versión fija:** cada skill del catálogo apunta a un commit revisado, no a la última versión.
 
@@ -182,6 +182,6 @@ Las metas numéricas se fijan después de validar con los primeros usuarios.
 | Sin datos de uso en claude.ai | Recomendar por relevancia, duplicados y choques |
 
 - [ ] Nombre definitivo y si el repo va en español, inglés o ambos.
-- [ ] Licencia: MIT o Apache-2.0.
+- [x] Licencia: MIT.
 - [ ] ¿El simulador predice con Claude o solo con reglas sobre las descripciones?
 - [ ] ¿Quién revisa el catálogo cuando llegue la fase 2?
