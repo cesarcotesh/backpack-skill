@@ -7,9 +7,14 @@ Locations follow the Claude Code docs (code.claude.com/docs/en/skills and
 /plugins/loading): personal ~/.claude/skills, project .claude/skills, plugins
 from ~/.claude/plugins/installed_plugins.json (cache/<marketplace>/<plugin>/<version>),
 and plugin folders saved under a skills dir (the "@skills-dir" origin).
+
+The Claude desktop app keeps its own plugins and the skills synced from claude.ai
+in its data folder (--app-data). That layout is not documented; it was read from
+a real install (local-agent-mode-sessions/<org>/<user>/rpm and .../skills-plugin).
 """
 import hashlib
 import json
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,8 +31,25 @@ def estimate_tokens(text):
     return round(len(text) / CHARS_PER_TOKEN)
 
 
+def fs_path(path):
+    """Absolute path that still works past Windows' 260-character limit.
+    Without the \\\\?\\ prefix, Python silently fails to see files in deep plugin folders."""
+    p = os.path.abspath(str(path))
+    if os.name == "nt" and not p.startswith("\\\\?\\"):
+        p = "\\\\?\\UNC\\" + p[2:] if p.startswith("\\\\") else "\\\\?\\" + p
+    return Path(p)
+
+
+def plain(path):
+    """Path as text for reports, without the Windows long-path prefix."""
+    s = str(path)
+    if s.startswith("\\\\?\\UNC\\"):
+        return "\\\\" + s[8:]
+    return s[4:] if s.startswith("\\\\?\\") else s
+
+
 def _warn(warnings, path, code, message):
-    warnings.append({"path": str(path), "code": code, "message": message})
+    warnings.append({"path": plain(path), "code": code, "message": message})
 
 
 def _read_bytes(path, warnings):
@@ -121,11 +143,22 @@ def _as_text(value):
 
 # --- origin ----------------------------------------------------------------------
 
-def detect_origin(skill_dir, plugin, warnings):
+def _inside(path, folder):
+    a, b = os.path.normcase(plain(path)), os.path.normcase(plain(folder))
+    return a.startswith(b.rstrip("\\/") + os.sep)
+
+
+def detect_origin(skill_dir, plugin, npx_root, warnings):
     if plugin:
-        return {"type": "plugin", "marketplace": plugin["marketplace"]}
+        if plugin.get("via") == "claude.ai":
+            return {"type": "claude.ai"}
+        origin = {"type": "plugin", "marketplace": plugin["marketplace"]}
+        return {**origin, "via": plugin["via"]} if plugin.get("via") else origin
     if skill_dir.is_symlink() or getattr(skill_dir, "is_junction", lambda: False)():
-        return {"type": "symlink", "target": str(skill_dir.resolve())}
+        target = skill_dir.resolve()
+        # `npx skills` keeps the real copy in ~/.agents/skills and links it into ~/.claude/skills
+        kind = "npx-skills" if npx_root and _inside(target, npx_root) else "symlink"
+        return {"type": kind, "target": plain(target)}
     git = skill_dir / ".git"
     if git.exists():
         remote = None
@@ -141,7 +174,7 @@ def detect_origin(skill_dir, plugin, warnings):
 
 # --- skills ----------------------------------------------------------------------
 
-def read_skill(skill_md, dir_name, scope, plugin, warnings):
+def read_skill(skill_md, dir_name, scope, plugin, warnings, skill_enabled=None, npx_root=None):
     raw = _read_bytes(skill_md, warnings)
     text = raw.decode("utf-8-sig", errors="replace")
     fm_lines, body, closed = split_frontmatter(text)
@@ -162,12 +195,12 @@ def read_skill(skill_md, dir_name, scope, plugin, warnings):
     listing = (description + (" " + when_to_use if when_to_use else ""))[:LISTING_CAP]
 
     model_invocable = not _is_true(fm.get("disable-model-invocation"))
-    loaded = plugin is None or plugin["enabled"] is not False
+    loaded = (plugin is None or plugin["enabled"] is not False) and skill_enabled is not False
     return {
         "name": name,
         "command": f"/{plugin['name']}:{name}" if plugin else f"/{name}",
         "scope": scope,
-        "path": str(skill_md),
+        "path": plain(skill_md),
         "description": description,
         "plugin": plugin,
         "flags": {
@@ -182,7 +215,7 @@ def read_skill(skill_md, dir_name, scope, plugin, warnings):
             "estimated": True,
         },
         "sha256": hashlib.sha256(raw).hexdigest(),
-        "origin": detect_origin(skill_md.parent, plugin, warnings),
+        "origin": detect_origin(skill_md.parent, plugin, npx_root, warnings),
     }
 
 
@@ -218,7 +251,7 @@ def installed_plugin_roots(plugins_dir, warnings):
         for pid, entries in data["plugins"].items():
             for entry in entries if isinstance(entries, list) else [entries]:
                 if isinstance(entry, dict) and entry.get("installPath"):
-                    roots.setdefault(Path(entry["installPath"]), pid)
+                    roots.setdefault(fs_path(entry["installPath"]), pid)
         return sorted((pid, path) for path, pid in roots.items())
     # ponytail: no install record, so take the last version dir by name per plugin
     out = []
@@ -231,7 +264,7 @@ def installed_plugin_roots(plugins_dir, warnings):
     return out
 
 
-def plugin_skills(root, plugin_id, marketplace, enabled_map, warnings):
+def plugin_skills(root, plugin_id, marketplace, enabled_map, warnings, via=None):
     """Skills of one plugin root as (skill_dir, dir_name, plugin) tuples."""
     manifest = _read_json(root / ".claude-plugin" / "plugin.json", warnings) or {}
     name = manifest.get("name") or (plugin_id or root.name).split("@")[0]
@@ -239,7 +272,9 @@ def plugin_skills(root, plugin_id, marketplace, enabled_map, warnings):
     enabled = enabled_map.get(plugin_id)
     if not isinstance(enabled, bool):
         enabled = manifest.get("defaultEnabled", True) if marketplace == "skills-dir" else None
-    plugin = {"id": plugin_id, "name": name, "marketplace": marketplace, "enabled": enabled, "root": str(root)}
+    plugin = {"id": plugin_id, "name": name, "marketplace": marketplace, "enabled": enabled, "root": plain(root)}
+    if via:
+        plugin["via"] = via
     if (root / "skills").is_dir():
         return [(d, d.name, plugin) for d in _skill_dirs(root / "skills")]
     if (root / "SKILL.md").is_file():  # single-skill plugin
@@ -247,20 +282,44 @@ def plugin_skills(root, plugin_id, marketplace, enabled_map, warnings):
     return []
 
 
-def build_inventory(home, projects=()):
-    home = Path(home)
-    projects = [Path(p) for p in projects]
+def app_skills(app_data, enabled_map, warnings):
+    """Skills the Claude desktop app loads by itself, as (skill_dir, dir_name, plugin, skill_enabled).
+    - its plugins: local-agent-mode-sessions/<org>/<user>/rpm/<plugin id>/, described in rpm/manifest.json
+    - skills synced from claude.ai: local-agent-mode-sessions/skills-plugin/<org>/<user>/, with a
+      per-skill "enabled" flag in its manifest.json
+    """
+    found = []
+    sessions = app_data / "local-agent-mode-sessions"
+    for rpm in sorted(sessions.glob("*/*/rpm")):
+        listed = (_read_json(rpm / "manifest.json", warnings) or {}).get("plugins") or []
+        meta = {p.get("id"): p for p in listed if isinstance(p, dict)}
+        for root in sorted(d for d in rpm.iterdir() if d.is_dir()):
+            mkt = meta.get(root.name, {}).get("marketplaceName") or "app"
+            found += [(d, n, plug, None) for d, n, plug in plugin_skills(root, None, mkt, enabled_map, warnings, via="app")]
+    for root in sorted(sessions.glob("skills-plugin/*/*")):
+        listed = (_read_json(root / "manifest.json", warnings) or {}).get("skills") or []
+        enabled = {s.get("name"): s.get("enabled") for s in listed if isinstance(s, dict)}
+        found += [(d, n, plug, enabled.get(n) if isinstance(enabled.get(n), bool) else None)
+                  for d, n, plug in plugin_skills(root, None, "claude.ai", enabled_map, warnings, via="claude.ai")]
+    return found
+
+
+def build_inventory(home, projects=(), app_data=None):
+    home = fs_path(home)
+    projects = [fs_path(p) for p in projects]
+    app_data = fs_path(app_data) if app_data else None
+    npx_root = home / ".agents" / "skills"
     warnings = []
     enabled_map = enabled_plugins(home, projects, warnings)
 
-    found = []  # (skill_dir, dir_name, scope, label, plugin)
+    found = []  # (skill_dir, dir_name, scope, label, plugin, skill_enabled)
     roots = [(home / ".claude" / "skills", "personal", "")]
     roots += [(p / ".claude" / "skills", "project", p.name) for p in projects]
     for skills_dir, scope, label in roots:
         plugin_dirs = _plugin_dirs(skills_dir)
-        found += [(d, d.name, scope, label, None) for d in _skill_dirs(skills_dir) if d not in plugin_dirs]
+        found += [(d, d.name, scope, label, None, None) for d in _skill_dirs(skills_dir) if d not in plugin_dirs]
         for pdir in plugin_dirs:
-            found += [(d, n, "plugin", plug["id"], plug)
+            found += [(d, n, "plugin", plug["id"], plug, None)
                       for d, n, plug in plugin_skills(pdir, None, "skills-dir", enabled_map, warnings)]
 
     for pid, root in installed_plugin_roots(home / ".claude" / "plugins", warnings):
@@ -268,12 +327,16 @@ def build_inventory(home, projects=()):
             _warn(warnings, root, "plugin_missing", f"El plugin {pid} está registrado pero su carpeta no existe.")
             continue
         mkt = pid.split("@", 1)[1] if "@" in pid else None
-        found += [(d, n, "plugin", pid, plug) for d, n, plug in plugin_skills(root, pid, mkt, enabled_map, warnings)]
+        found += [(d, n, "plugin", pid, plug, None)
+                  for d, n, plug in plugin_skills(root, pid, mkt, enabled_map, warnings)]
+
+    if app_data:
+        found += [(d, n, "plugin", plug["id"], plug, on) for d, n, plug, on in app_skills(app_data, enabled_map, warnings)]
 
     skills, ids = [], set()
-    for skill_dir, dir_name, scope, label, plugin in found:
+    for skill_dir, dir_name, scope, label, plugin, skill_enabled in found:
         try:
-            skill = read_skill(skill_dir / "SKILL.md", dir_name, scope, plugin, warnings)
+            skill = read_skill(skill_dir / "SKILL.md", dir_name, scope, plugin, warnings, skill_enabled, npx_root)
         except OSError:
             _warn(warnings, skill_dir, "skill_unreadable", "No se pudo leer esta skill.")
             continue
@@ -302,7 +365,8 @@ def build_inventory(home, projects=()):
         "schema_version": SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "estimator": {"method": "chars_per_token", "chars_per_token": CHARS_PER_TOKEN, "estimated": True},
-        "sources": {"home": str(home), "projects": [str(p) for p in projects]},
+        "sources": {"home": plain(home), "projects": [plain(p) for p in projects],
+                    "app_data": plain(app_data) if app_data else None},
         "totals": {
             "skills": len(skills),
             "fixed_tokens": sum(s["tokens"]["fixed"] for s in skills),

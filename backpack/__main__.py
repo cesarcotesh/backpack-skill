@@ -14,6 +14,8 @@ def main(argv=None):
     # --home is required on purpose: nothing reads the real ~/.claude unless asked explicitly
     inv.add_argument("--home", required=True, help="Carpeta que contiene .claude (por ejemplo, tu carpeta de usuario).")
     inv.add_argument("--project", action="append", default=[], help="Carpeta de un proyecto. Se puede repetir.")
+    inv.add_argument("--app-data", help="Carpeta de datos de la app de escritorio de Claude "
+                                        "(en Windows, %%APPDATA%%\\Claude), para incluir sus plugins y las skills de claude.ai.")
     inv.add_argument("--out", default="out", help="Carpeta donde se guarda inventory.json.")
     scan = sub.add_parser("scan", help="Revisa la seguridad de las skills del inventario y genera scan.json.")
     scan.add_argument("--inventory", default="out/inventory.json", help="Ruta de inventory.json.")
@@ -47,7 +49,7 @@ def main(argv=None):
         print(f"Guardado en {path}")
         return 0
 
-    inventory = build_inventory(args.home, args.project)
+    inventory = build_inventory(args.home, args.project, args.app_data)
     path = write_inventory(inventory, args.out)
     t = inventory["totals"]
     print(f"Inventario listo: {t['skills']} skills, ~{t['fixed_tokens']} tokens fijos por conversación (estimado).")

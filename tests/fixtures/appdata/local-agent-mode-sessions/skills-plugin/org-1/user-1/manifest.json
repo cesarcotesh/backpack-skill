@@ -1,0 +1,7 @@
+{
+  "lastUpdated": 1759400000000,
+  "skills": [
+    { "skillId": "s1", "name": "brand-voice", "enabled": true, "creatorType": "user" },
+    { "skillId": "s2", "name": "old-report", "enabled": false, "creatorType": "user" }
+  ]
+}

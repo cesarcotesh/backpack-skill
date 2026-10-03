@@ -1,0 +1,7 @@
+{
+  "lastUpdated": 1759400000000,
+  "plugins": [
+    { "id": "plugin_AAA", "name": "travel", "marketplaceName": "knowledge-work-plugins", "installationPreference": "available" },
+    { "id": "plugin_BBB", "name": "docs-kit", "marketplaceName": "anthropic-plugin-directory", "installationPreference": "available" }
+  ]
+}

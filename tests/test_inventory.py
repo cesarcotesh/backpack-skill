@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from backpack.inventory import LISTING_CAP, build_inventory, estimate_tokens, write_inventory
+from backpack.inventory import LISTING_CAP, build_inventory, estimate_tokens, fs_path, plain, write_inventory
 
 FIXTURES = Path(__file__).parent / "fixtures"
 PACKAGE = Path(__file__).parent.parent / "backpack"
@@ -26,7 +26,7 @@ def tree_hash(root):
 class InventoryTest(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.addCleanup(shutil.rmtree, fs_path(self.tmp), ignore_errors=True)  # fs_path: long test paths too
         shutil.copytree(FIXTURES, self.tmp / "fx")
         self.home = self.tmp / "fx" / "home"
         self.project = self.tmp / "fx" / "project"
@@ -116,6 +116,47 @@ class InventoryTest(unittest.TestCase):
             self.skipTest("symlinks not available here")
         origin = {s["id"]: s for s in build_inventory(self.home)["skills"]}["personal:linked"]["origin"]
         self.assertEqual(origin["type"], "symlink")
+
+    def test_desktop_app_sources(self):
+        inv = build_inventory(self.home, [], self.tmp / "fx" / "appdata")
+        s = {x["id"]: x for x in inv["skills"]}
+        trip = s["plugin:travel@knowledge-work-plugins/plan-trip"]
+        self.assertEqual(trip["command"], "/travel:plan-trip")
+        self.assertEqual(trip["origin"], {"type": "plugin", "marketplace": "knowledge-work-plugins", "via": "app"})
+        self.assertGreater(trip["tokens"]["fixed"], 0)
+        brand = s["plugin:anthropic-skills@claude.ai/brand-voice"]
+        self.assertEqual(brand["origin"], {"type": "claude.ai"})
+        self.assertGreater(brand["tokens"]["fixed"], 0)
+        old = s["plugin:anthropic-skills@claude.ai/old-report"]  # turned off on claude.ai
+        self.assertEqual((old["flags"]["loaded"], old["tokens"]["fixed"]), (False, 0))
+        groups = {g["name"]: g for g in inv["copy_groups"]}
+        self.assertEqual(groups["pdf-helper"]["kind"], "exact")  # personal copy + app plugin copy
+        self.assertIn("plugin:docs-kit@anthropic-plugin-directory/pdf-helper", groups["pdf-helper"]["skill_ids"])
+
+    def test_long_windows_paths(self):
+        if os.name != "nt":
+            self.skipTest("Windows-only path limit")
+        nested =self.home / ".claude" / "plugins" / "cache" / "acme" / ("p" * 120) / ("v" * 120)
+        os.makedirs(fs_path(nested / "skills" / "deep-skill"))
+        (fs_path(nested / "skills" / "deep-skill") / "SKILL.md").write_text(
+            "---\nname: deep-skill\ndescription: Muy profunda.\n---\n", encoding="utf-8")
+        self.assertGreater(len(plain(fs_path(nested / "skills" / "deep-skill" / "SKILL.md"))), 260)
+        (self.home / ".claude" / "plugins" / "installed_plugins.json").unlink()
+        inv = build_inventory(self.home)
+        ids = {x["id"] for x in inv["skills"]}
+        self.assertIn(f"plugin:{'p' * 120}@acme/deep-skill", ids)
+        self.assertFalse(any(x["path"].startswith("\\\\?\\") for x in inv["skills"]))
+
+    def test_npx_skills_origin(self):
+        real = self.home / ".agents" / "skills" / "npx-tool"
+        real.mkdir(parents=True)
+        (real / "SKILL.md").write_text("---\nname: npx-tool\ndescription: Instalada con npx.\n---\n", encoding="utf-8")
+        try:
+            os.symlink(real, self.home / ".claude" / "skills" / "npx-tool", target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlinks not available here")
+        origin = {x["id"]: x for x in build_inventory(self.home)["skills"]}["personal:npx-tool"]["origin"]
+        self.assertEqual(origin["type"], "npx-skills")
 
     def test_warnings(self):
         codes = {(Path(w["path"]).relative_to(self.home).as_posix(), w["code"]) for w in self.inv["warnings"]}
