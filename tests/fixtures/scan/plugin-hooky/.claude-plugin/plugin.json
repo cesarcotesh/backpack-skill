@@ -1,0 +1,7 @@
+{
+  "name": "hooky",
+  "version": "1.0.0",
+  "lspServers": {
+    "fake-lsp": { "command": "fake-lsp", "extensionToLanguage": { ".txt": "plaintext" } }
+  }
+}

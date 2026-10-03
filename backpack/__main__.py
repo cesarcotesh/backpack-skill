@@ -25,6 +25,8 @@ def main(argv=None):
         path = write_scan(result, args.out)
         t = result["totals"]
         print(f"Revisión lista: {t['high']} con riesgo alto, {t['medium']} medio, {t['low']} bajo, {t['none']} sin hallazgos.")
+        p = result["plugin_totals"]
+        print(f"Plugins: {p['high']} con riesgo alto, {p['medium']} medio, {p['low']} bajo, {p['none']} sin hallazgos.")
         print(result["disclaimer"])
         print(f"Guardado en {path}")
         return 0

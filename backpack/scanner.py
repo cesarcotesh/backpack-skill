@@ -36,15 +36,23 @@ RULES = {
             "Incluye frases que piden ignorar reglas, activarse siempre, ocultarte cosas o declararse segura."),
     "R07": ("high", "Descarga y ejecuta",
             "Descarga algo de internet y lo ejecuta en un solo paso, sin que puedas revisarlo antes."),
-    "R08": ("high", "Ejecuta comandos al activarse",
-            "Corre comandos en tu equipo apenas se activa, antes de que Claude lea la skill."),
+    "R08": ("high", "Ejecuta comandos por su cuenta",
+            "Corre comandos en tu equipo de forma automática: al activarse o en ciertos momentos de la sesión, sin que se lo pidas."),
     "R09": ("medium", "Permisos muy amplios",
             "Pide usar la terminal sin restricciones mientras está activa."),
     "R10": ("low", "Archivo que no es texto",
             "Trae un archivo que no se puede leer como texto, así que no se pudo revisar."),
     "R11": ("medium", "Enlace a otro lugar",
             "Trae un enlace que apunta a otra parte de tu equipo. No se siguió."),
+    "R12": ("medium", "Arranca programas al abrir Claude",
+            "El plugin pone en marcha programas o se conecta a servicios cada vez que abres Claude Code."),
 }
+
+# Plugin components that run things on their own (Claude Code docs: plugins-reference)
+PLUGIN_COMPONENTS = {"hooks/hooks.json": "R08", "monitors/monitors.json": "R08", ".mcp.json": "R12", ".lsp.json": "R12"}
+_RUN_LINE = re.compile(r'"(?:command|url)"\s*:')
+_MANIFEST_KEY = re.compile(r'^\s*"(hooks|monitors|mcpServers|lspServers)"\s*:')
+_MANIFEST_RULE = {"hooks": "R08", "monitors": "R08", "mcpServers": "R12", "lspServers": "R12"}
 
 _I = re.I
 LINE_RULES = [
@@ -117,8 +125,19 @@ class _Scan:
 
     def scan_text(self, rel, text, is_skill_md):
         lines = text.splitlines()
-        if Path(rel).suffix.lower() in SCRIPT_EXT or (lines and lines[0].startswith("#!")):
+        if (Path(rel).suffix.lower() in SCRIPT_EXT or rel.startswith("bin/")  # plugin bin/ is on the Bash PATH
+                or (lines and lines[0].startswith("#!"))):
             self.add("R01", rel, 1, lines[0] if lines else "")
+        component = PLUGIN_COMPONENTS.get(rel)
+        if component:
+            run_lines = [(no, line) for no, line in enumerate(lines, 1) if _RUN_LINE.search(line)]
+            for no, line in run_lines or [(1, lines[0] if lines else "")]:
+                self.add(component, rel, no, line)
+        if rel == ".claude-plugin/plugin.json":
+            for no, line in enumerate(lines, 1):
+                m = _MANIFEST_KEY.match(line)
+                if m:
+                    self.add(_MANIFEST_RULE[m.group(1)], rel, no, line)
         for no, line in enumerate(lines, 1):
             for rule, rx in LINE_RULES:
                 if rx.search(line):
@@ -148,14 +167,24 @@ class _Scan:
 
 def scan_skill(skill_dir):
     """Scan one skill folder. Returns {"risk", "findings", "truncated"}."""
-    skill_dir = Path(skill_dir)
+    return _scan_folder(Path(skill_dir))
+
+
+def scan_plugin(plugin_root):
+    """Scan a plugin's own files (hooks, MCP/LSP servers, bin/, commands, agents...).
+    Its skills/ folder is left out: each skill there is scanned on its own."""
+    return _scan_folder(Path(plugin_root), skip_top={"skills"})
+
+
+def _scan_folder(skill_dir, skip_top=frozenset()):
     scan, count, truncated = _Scan(), 0, False
     for dirpath, dirnames, filenames in os.walk(skill_dir):  # followlinks=False: linked dirs are not entered
         here = Path(dirpath)
         for d in sorted(dirnames):
             if (here / d).is_symlink():
                 scan.add("R11", (here / d).relative_to(skill_dir).as_posix(), None)
-        dirnames[:] = sorted(d for d in dirnames if d != ".git" and not (here / d).is_symlink())
+        dirnames[:] = sorted(d for d in dirnames if d != ".git" and not (here / d).is_symlink()
+                             and not (here == skill_dir and d in skip_top))
         for name in sorted(filenames):
             path = here / name
             rel = path.relative_to(skill_dir).as_posix()
@@ -197,17 +226,31 @@ def scan_inventory(inventory):
                                  "message": "No se pudo revisar esta skill."})
                 continue
         results[skill["id"]] = by_dir[skill_dir]
-    totals = {level: 0 for level in SEVERITY_ORDER}
-    for r in results.values():
-        totals[r["risk"]] += 1
+
+    plugins = {}
+    roots = {s["plugin"]["id"]: Path(s["plugin"]["root"]) for s in inventory["skills"] if s.get("plugin")}
+    for pid, root in sorted(roots.items()):
+        try:
+            plugins[pid] = scan_plugin(root)
+        except OSError:
+            warnings.append({"path": str(root), "code": "plugin_unreadable", "message": "No se pudo revisar este plugin."})
+
+    def count(items):
+        totals = {level: 0 for level in SEVERITY_ORDER}
+        for r in items.values():
+            totals[r["risk"]] += 1
+        return totals
+
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "disclaimer": DISCLAIMER,
         "allowed_domains": list(ALLOWED_DOMAINS),
         "rules": [{"id": k, "severity": v[0], "title": v[1], "explanation": v[2]} for k, v in RULES.items()],
-        "totals": totals,
+        "totals": count(results),
+        "plugin_totals": count(plugins),
         "skills": results,
+        "plugins": plugins,
         "warnings": warnings,
     }
 
