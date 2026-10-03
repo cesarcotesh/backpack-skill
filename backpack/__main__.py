@@ -2,6 +2,7 @@ import argparse
 import json
 import sys
 
+from .audit import build_audit, write_audit
 from .inventory import build_inventory, write_inventory
 from .scanner import scan_inventory, write_scan
 
@@ -17,7 +18,22 @@ def main(argv=None):
     scan = sub.add_parser("scan", help="Revisa la seguridad de las skills del inventario y genera scan.json.")
     scan.add_argument("--inventory", default="out/inventory.json", help="Ruta de inventory.json.")
     scan.add_argument("--out", default="out", help="Carpeta donde se guarda scan.json.")
+    aud = sub.add_parser("audit", help="Da un semáforo y una recomendación por skill y genera audit.json.")
+    aud.add_argument("--inventory", default="out/inventory.json", help="Ruta de inventory.json.")
+    aud.add_argument("--scan", default="out/scan.json", help="Ruta de scan.json.")
+    aud.add_argument("--out", default="out", help="Carpeta donde se guarda audit.json.")
     args = parser.parse_args(argv)
+
+    if args.command == "audit":
+        with open(args.inventory, encoding="utf-8") as f, open(args.scan, encoding="utf-8") as g:
+            result = build_audit(json.load(f), json.load(g))
+        path = write_audit(result, args.out)
+        t = result["totals"]
+        print(f"Auditoría lista: {t['lights']['orange']} para quitar, {t['lights']['mustard']} para revisar, "
+              f"{t['lights']['green']} para conservar.")
+        print(f"Quitando lo sugerido, la carga fija baja de ~{t['fixed_tokens']} a ~{t['fixed_tokens_after_removals']} tokens (estimado).")
+        print(f"Guardado en {path}")
+        return 0
 
     if args.command == "scan":
         with open(args.inventory, encoding="utf-8") as f:
