@@ -150,10 +150,13 @@ def read_skill(skill_md, dir_name, scope, plugin, warnings):
     fm, bad = parse_frontmatter(fm_lines or [])
     if bad:
         _warn(warnings, skill_md, "frontmatter_unparsed", f"{len(bad)} línea(s) del encabezado no se entendieron.")
+    malformed = not closed or bool(bad)
+    if malformed:  # Claude Code loads a skill with malformed frontmatter with empty metadata
+        fm = {}
 
     name = _as_text(fm.get("name")).strip() or dir_name
     description = _as_text(fm.get("description")).strip()
-    if not description:  # Claude Code falls back to the first non-empty markdown line
+    if not description and not malformed:  # Claude Code falls back to the first non-empty markdown line
         description = next((l.strip() for l in body.splitlines() if l.strip() and l.strip() != "---"), "")
     when_to_use = _as_text(fm.get("when_to_use")).strip()
     listing = (description + (" " + when_to_use if when_to_use else ""))[:LISTING_CAP]

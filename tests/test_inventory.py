@@ -85,6 +85,8 @@ class InventoryTest(unittest.TestCase):
         self.assertFalse(multi["flags"]["user_invocable"])
         self.assertEqual(self.skill("personal:notes")["description"], "Toma notas rápidas de reuniones.")
         self.assertEqual(self.skill("plugin:dormant@acme/dormant")["name"], "dormant")
+        broken = self.skill("personal:broken")  # malformed frontmatter loads with empty metadata
+        self.assertEqual((broken["name"], broken["description"]), ("broken", ""))
 
     def test_plugins(self):
         review = self.skill("plugin:toolkit@acme/review")
