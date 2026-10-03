@@ -203,6 +203,8 @@ def read_skill(skill_md, dir_name, scope, plugin, warnings, skill_enabled=None, 
         "scope": scope,
         "path": plain(skill_md),
         "description": description,
+        "when_to_use": when_to_use or None,
+        "argument_hint": _as_text(fm.get("argument-hint")).strip() or None,
         "plugin": plugin,
         "flags": {
             "model_invocable": model_invocable,
