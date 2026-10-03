@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from itertools import combinations
 from pathlib import Path
 
+from .i18n import lang, n as _n, t
 from .usage import days_since
 
 SCHEMA_VERSION = 1
@@ -42,11 +43,6 @@ def words(text):
 def similarity(a, b):
     """Jaccard similarity of two word sets."""
     return len(a & b) / len(a | b) if a and b else 0.0
-
-
-def _n(number):
-    """9394 -> '9.394', as the app shows numbers."""
-    return f"{number:,}".replace(",", ".")
 
 
 def _reason(code, text, related=()):
@@ -102,16 +98,16 @@ def build_audit(inventory, scan, usage=None, today=None):
             for sid in ids:
                 if sid == keeper:
                     reasons[sid].append(_reason("exact_copy_keeper",
-                        "Tiene copias exactas en otros lugares. Esta es la que conviene conservar.", [i for i in ids if i != sid]))
+                        t("reason.exact_copy_keeper"), [i for i in ids if i != sid]))
                 else:
                     reasons[sid].append(_reason("exact_copy_extra",
-                        f"Es una copia exacta de {name_of(keeper)}. Puedes quitar esta y quedarte con la otra.", [keeper]))
+                        t("reason.exact_copy_extra", other=name_of(keeper)), [keeper]))
                     recs[sid].add("remove")
         else:
             for sid in ids:
                 others = [i for i in ids if i != sid]
                 reasons[sid].append(_reason("same_name_variants",
-                    "Hay otra skill con el mismo nombre pero distinto contenido. Elige una o júntalas en una sola.", others))
+                    t("reason.same_name_variants"), others))
                 recs[sid].add("merge")
 
     # competing descriptions: only skills Claude can actually pick
@@ -128,50 +124,48 @@ def build_audit(inventory, scan, usage=None, today=None):
     for pair in competing:
         for sid, other in (pair["skills"], pair["skills"][::-1]):
             reasons[sid].append(_reason("competes",
-                f"Hace casi lo mismo que {name_of(other)}. Claude puede confundirse entre las dos; quédate con una.", [other]))
+                t("reason.competes", other=name_of(other)), [other]))
             recs[sid].add("merge")
 
     for s in skills:
         sid = s["id"]
         if s["flags"]["model_invocable"] and s["flags"]["loaded"] and _GREEDY.search(s["description"]):
             reasons[sid].append(_reason("greedy",
-                "Su descripción pide usarse siempre o antes de cualquier respuesta, así que se cuela donde no hace falta."))
+                t("reason.greedy")))
             recs[sid].add("tune")
         if s["tokens"]["fixed"] >= HEAVY_FIXED:
             reasons[sid].append(_reason("heavy_fixed",
-                f"Su descripción es larga: ocupa ~{_n(s['tokens']['fixed'])} tokens en cada conversación (estimado)."))
+                t("reason.heavy_fixed", tokens=_n(s["tokens"]["fixed"]))))
             recs[sid].add("tune")
         if s["tokens"]["body"] >= HEAVY_BODY:
             reasons[sid].append(_reason("heavy_body",
-                f"Al activarse carga ~{_n(s['tokens']['body'])} tokens (estimado)."))
+                t("reason.heavy_body", tokens=_n(s["tokens"]["body"]))))
             recs[sid].add("tune")
         if not s["flags"]["loaded"]:
-            reasons[sid].append(_reason("disabled", "Está desactivada, así que hoy no pesa."))
+            reasons[sid].append(_reason("disabled", t("reason.disabled")))
         u = use.get(sid)
         if u and u["count"] == 0 and since:
-            text = f"No hay registro de uso desde el {since} (hace {days_since(since, today)} días)."
+            text = t("reason.unused_since", since=since, days=days_since(since, today))
             if s["tokens"]["fixed"] > 0:  # disabled or slash-only skills don't weigh on every conversation
-                text += f" Igual ocupa ~{_n(s['tokens']['fixed'])} tokens en cada conversación (estimado); conviene quitarla."
+                text += t("reason.unused_weighs", tokens=_n(s["tokens"]["fixed"]))
                 recs[sid].add("remove")
             reasons[sid].append(_reason("unused", text))
         elif u and u["days_unused"] is not None and u["days_unused"] >= UNUSED_DAYS:
-            reasons[sid].append(_reason("unused", f"No la usas hace {u['days_unused']} días."))
+            reasons[sid].append(_reason("unused", t("reason.unused_days", days=u["days_unused"])))
 
         # security of the skill's own folder; the rest of a plugin is judged once, under "plugins"
         result = scan.get("skills", {}).get(sid)
         if result and result.get("self"):
             # the reviewer itself: same findings, told plainly; never suggested for removal
-            titles = ", ".join(_risk_titles(result, rules)).lower() or "ninguno"
-            reasons[sid] = [_reason("self",
-                "Esta es Backpack Skill, la herramienta que hace esta revisión. Sus reglas contienen los patrones "
-                f"que buscan ({titles}), por eso aparecen hallazgos. Su código es abierto: puedes revisarlo.")]
+            titles = ", ".join(_risk_titles(result, rules)).lower() or t("reason.none")
+            reasons[sid] = [_reason("self", t("reason.self", titles=titles))]
             recs[sid] = set()
         elif result and result["risk"] in ("high", "medium"):
             titles = ", ".join(_risk_titles(result, rules)).lower()
             if result["risk"] == "high":
-                text = f"La revisión de seguridad encontró algo serio: {titles}. Revísala antes de seguir usándola."
+                text = t("reason.security_high", titles=titles)
             else:
-                text = f"La revisión de seguridad encontró algo para revisar: {titles}."
+                text = t("reason.security_medium", titles=titles)
             reasons[sid].append(_reason(f"security_{result['risk']}", text))
             recs[sid].add("review")
 
@@ -196,17 +190,16 @@ def build_audit(inventory, scan, usage=None, today=None):
         if result["risk"] in ("high", "medium"):
             titles = ", ".join(_risk_titles(result, rules)).lower()
             if result["risk"] == "high":
-                text = f"Fuera de sus skills, el plugin trae algo serio: {titles}. Revísalo antes de seguir usándolo."
+                text = t("reason.plugin_security_high", titles=titles)
             else:
-                text = f"Fuera de sus skills, el plugin trae algo para revisar: {titles}."
+                text = t("reason.plugin_security_medium", titles=titles)
             plugin_reasons.append(_reason(f"security_{result['risk']}", text))
         rec = "review" if plugin_reasons else "keep"
         weight = sum(s["tokens"]["fixed"] for s in plugin_skills)
         # a plugin is uninstalled as a whole: suggest it only when none of its skills was used
         if since and weight > 0 and all(use.get(s["id"], {}).get("count") == 0 for s in plugin_skills):
             plugin_reasons.insert(0, _reason("unused",
-                f"No usas ninguna de sus {len(plugin_skills)} skills desde el {since}. "
-                f"Quitar el plugin libera ~{_n(weight)} tokens en cada conversación (estimado)."))
+                t("reason.plugin_unused", count=len(plugin_skills), since=since, tokens=_n(weight))))
             rec = "remove"
         light = "orange" if rec == "remove" else "mustard" if rec == "review" else "green"
         plugin_lights[light] += 1
@@ -224,6 +217,7 @@ def build_audit(inventory, scan, usage=None, today=None):
     savings = sum(s["tokens"]["fixed"] for s in skills if results[s["id"]]["recommendation"] == "remove")
     return {
         "schema_version": SCHEMA_VERSION,
+        "lang": lang(),
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "thresholds": {"overlap_min": OVERLAP_MIN, "heavy_fixed": HEAVY_FIXED, "heavy_body": HEAVY_BODY},
         "totals": {

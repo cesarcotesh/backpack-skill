@@ -9,19 +9,14 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .audit import _n
+from .i18n import n as _n, t
 from .inventory import MAX_READ, fs_path, split_frontmatter
 
 SCHEMA_VERSION = 1
 MAX_RECIPE_STEPS = 8  # a skill naming more than 7 others is an index, not a recipe
 
-TOOL_WORDS = {  # allowed-tools in plain Spanish
-    "Read": "leer archivos", "Grep": "buscar en archivos", "Glob": "buscar archivos",
-    "Write": "crear archivos", "Edit": "modificar archivos", "NotebookEdit": "modificar notebooks",
-    "Bash": "usar la terminal", "PowerShell": "usar la terminal",
-    "WebFetch": "abrir páginas de internet", "WebSearch": "buscar en internet",
-    "Task": "lanzar otros agentes", "Agent": "lanzar otros agentes", "Skill": "usar otras skills",
-}
+TOOLS = {"Read", "Grep", "Glob", "Write", "Edit", "NotebookEdit", "Bash", "PowerShell",
+         "WebFetch", "WebSearch", "Task", "Agent", "Skill"}  # plain words for each are in i18n ("tool.<name>")
 _TOOL = re.compile(r"[\w-]+")
 _SENTENCE = re.compile(r"(?<=[.!?])\s+")
 _WHEN_NOT = re.compile(r"\b(?:do\s+not\s+use|don'?t\s+use|not\s+for\b|never\s+use|no\s+la\s+uses|no\s+usar|no\s+es\s+para|ev[ií]tala)", re.I)
@@ -52,43 +47,42 @@ def _needs(skill, plugin_rules):
     tools = tools if isinstance(tools, list) else [tools]
     words = []
     for token in (t for item in tools for t in _TOOL.findall(str(item))):
-        word = TOOL_WORDS.get(token) or (f"conectarse a {token.split('__')[1]}" if token.startswith("mcp__") and "__" in token[5:] else None)
+        word = t(f"tool.{token}") if token in TOOLS else (
+            t("tool.mcp", server=token.split("__")[1]) if token.startswith("mcp__") and "__" in token[5:] else None)
         if word and word not in words:
             words.append(word)
     if "R12" in plugin_rules:
-        words.append("que su plugin arranque programas en tu equipo")
+        words.append(t("needs.R12"))
     if "R13" in plugin_rules:
-        words.append("que su plugin se conecte a servicios en internet")
+        words.append(t("needs.R13"))
     return words
 
 
 def _activation(skill):
     f, cmd = skill["flags"], skill["command"]
     if not f["loaded"]:
-        return "Está desactivada: hoy no se activa."
+        return t("activation.disabled")
     if f["model_invocable"] and f["user_invocable"]:
-        return f"Claude la activa sola cuando tu pedido coincide con su descripción. También puedes llamarla escribiendo {cmd}."
+        return t("activation.both", command=cmd)
     if f["model_invocable"]:
-        return "Claude la activa sola cuando tu pedido coincide con su descripción; no tiene comando para escribir."
-    return f"Solo se activa si escribes {cmd}."
+        return t("activation.model")
+    return t("activation.user", command=cmd)
 
 
 def _usage(u, since):
     if u is None:
-        return "Sin datos de uso aquí."
+        return t("usage.none_here")
     if u["count"] == 0:
-        return f"Sin uso registrado desde el {since}." if since else "Sin uso registrado."
-    times = "vez" if u["count"] == 1 else "veces"
-    when = "hoy" if u["days_unused"] == 0 else f"hace {u['days_unused']} días"
-    return f"La usaste {u['count']} {times}; la última, {when}."
+        return t("usage.unused_since", since=since) if since else t("usage.unused")
+    when = t("usage.today") if u["days_unused"] == 0 else t("usage.days_ago", days=u["days_unused"])
+    return t("usage.used_one", when=when) if u["count"] == 1 else t("usage.used_many", count=u["count"], when=when)
 
 
 def _risk(result, rules):
     if not result or result["risk"] == "none":
-        return "La revisión automática no encontró nada. Eso reduce el riesgo, no lo descarta."
+        return t("risk.none")
     titles = sorted({rules[f["rule"]]["title"].lower() for f in result["findings"]})
-    level = {"high": "algo serio", "medium": "algo para revisar", "low": "detalles menores"}[result["risk"]]
-    return f"La revisión automática encontró {level}: {', '.join(titles)}."
+    return t("risk.found", level=t(f"risk.level.{result['risk']}"), titles=", ".join(titles))
 
 
 def _body(path):
@@ -137,7 +131,7 @@ def build_manual(inventory, scan, audit):
             # ponytail: one level (the skill and what it names); follow chains deeper if recipes feel thin
             recipes.append({
                 "id": f"recipe:{s['id']}",
-                "title": f"Con {s['command']}",
+                "title": t("recipe.title", command=s["command"]),
                 "steps": [s["id"]] + in_desc + in_body,
                 "declared_in": {**{t: "description" for t in in_desc}, **{t: "body" for t in in_body}},
             })
@@ -152,18 +146,18 @@ def build_manual(inventory, scan, audit):
         a = audit["skills"][sid]
         plugin_result = scan.get("plugins", {}).get(s["plugin"]["id"]) if s.get("plugin") else None
         plugin_rules = {f["rule"] for f in (plugin_result or {}).get("findings", [])}
-        t = s["tokens"]
+        tok = s["tokens"]
         cards[sid] = {
             "name": s["name"],
             "command": s["command"],
-            "what": _first_sentence(s["description"]) or "Su autor no escribió una descripción.",
+            "what": _first_sentence(s["description"]) or t("card.no_description"),
             "activation": _activation(s),
             "triggers": s.get("when_to_use"),
             "how_to_call": f"{s['command']} {s['argument_hint']}" if s.get("argument_hint") else s["command"],
             "needs": _needs(s, plugin_rules),
             "when_not": _when_not(s["description"] + " " + (s.get("when_to_use") or "")),
             "usage": _usage(a.get("usage"), since),
-            "weight": f"Ocupa ~{_n(t['fixed'])} tokens en cada conversación y ~{_n(t['body'])} cuando se activa (estimado).",
+            "weight": t("card.weight", fixed=_n(tok["fixed"]), body=_n(tok["body"])),
             "risk": _risk(scan.get("skills", {}).get(sid), rules),
             "light": a["light"],
             "recommendation": a["recommendation"],

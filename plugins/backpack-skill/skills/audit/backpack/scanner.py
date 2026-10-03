@@ -11,6 +11,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .i18n import t
 from .inventory import MAX_READ, fs_path, parse_frontmatter, plain, split_frontmatter
 
 SCHEMA_VERSION = 1
@@ -18,37 +19,10 @@ SEVERITY_ORDER = ["none", "low", "medium", "high"]
 ALLOWED_DOMAINS = ("github.com", "anthropic.com", "claude.com", "pypi.org", "npmjs.com")
 MAX_FILES = 1000  # per skill folder
 MAX_FINDINGS = 200  # per skill
-DISCLAIMER = "El análisis automático reduce el riesgo, pero no garantiza que una skill sea segura."
 
-# id: (severity, title, explanation). User-facing text in plain Spanish.
-RULES = {
-    "R01": ("low", "Trae scripts",
-            "Incluye archivos de código que se pueden ejecutar. No es malo por sí solo, pero conviene saber qué hacen."),
-    "R02": ("medium", "Se conecta a internet",
-            "Menciona direcciones o comandos de red hacia sitios que no están en la lista de sitios conocidos."),
-    "R03": ("high", "Comandos que borran",
-            "Contiene comandos capaces de borrar o dañar archivos de tu equipo."),
-    "R04": ("high", "Texto escondido",
-            "Tiene texto codificado o caracteres invisibles que ocultan lo que realmente dice."),
-    "R05": ("high", "Toca contraseñas o claves",
-            "Menciona archivos o variables donde se guardan contraseñas, llaves o claves de acceso."),
-    "R06": ("high", "Intenta darle órdenes a Claude",
-            "Incluye frases que piden ignorar reglas, activarse siempre, ocultarte cosas o declararse segura."),
-    "R07": ("high", "Descarga y ejecuta",
-            "Descarga algo de internet y lo ejecuta en un solo paso, sin que puedas revisarlo antes."),
-    "R08": ("high", "Ejecuta comandos por su cuenta",
-            "Corre comandos en tu equipo de forma automática: al activarse o en ciertos momentos de la sesión, sin que se lo pidas."),
-    "R09": ("medium", "Permisos muy amplios",
-            "Pide usar la terminal sin restricciones mientras está activa."),
-    "R10": ("low", "Archivo que no es texto",
-            "Trae un archivo que no se puede leer como texto, así que no se pudo revisar."),
-    "R11": ("medium", "Enlace a otro lugar",
-            "Trae un enlace que apunta a otra parte de tu equipo. No se siguió."),
-    "R12": ("medium", "Arranca programas al abrir Claude",
-            "El plugin pone en marcha programas en tu equipo cada vez que abres Claude."),
-    "R13": ("low", "Se conecta a servicios",
-            "El plugin conecta Claude con servicios en internet. No corre programas en tu equipo."),
-}
+# id -> severity; titles and explanations are in i18n ("rule.<id>.title" / ".text")
+RULES = {"R01": "low", "R02": "medium", "R03": "high", "R04": "high", "R05": "high", "R06": "high", "R07": "high",
+         "R08": "high", "R09": "medium", "R10": "low", "R11": "medium", "R12": "medium", "R13": "low"}
 
 # Plugin components that run things on their own (Claude Code docs: plugins-reference)
 PLUGIN_COMPONENTS = {"hooks/hooks.json": "R08", "monitors/monitors.json": "R08", ".mcp.json": "R12", ".lsp.json": "R12"}
@@ -61,7 +35,7 @@ LINE_RULES = [
     ("R03", re.compile(r"\brm\s+-[a-z]*(?:r[a-z]*f|f[a-z]*r)|\bRemove-Item\b.*-Recurse|\b(?:del|erase|rmdir|rd)\b.*\s/[sq]\b"
                        r"|\bmkfs\b|\bdd\s+if=|\bchmod\s+(?:-R\s+)?777\b|\bformat\s+[a-z]:", _I)),
     ("R04", re.compile(r"[A-Za-z0-9+/]{200,}={0,2}|\b(?:eval|exec)\s*\(.*(?:b64decode|atob|base64|fromCharCode)"
-                       r"|\bbase64\s+(?:-d|--decode)\b|FromBase64String|[​-‏‪-‮⁠-⁤⁦-⁩]", _I)),
+                       r"|\bbase64\s+(?:-d|--decode)\b|FromBase64String|[\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069]", _I)),
     ("R05", re.compile(r"(?<!\w)\.env\b|\.ssh\b|\bid_(?:rsa|dsa|ecdsa|ed25519)\b|\.aws/credentials|\.netrc\b|\.git-credentials"
                        r"|(?:os\.environ|process\.env|\$env:|getenv)\W*\w*(?:key|token|secret|passw)"
                        r"|\bsecurity\s+find-(?:generic|internet)-password", _I)),
@@ -84,7 +58,7 @@ _TOOL_TOKEN = re.compile(r"[\w-]+(?:\([^)]*\))?")
 SCRIPT_EXT = {".py", ".sh", ".bash", ".zsh", ".js", ".mjs", ".cjs", ".ts", ".ps1", ".psm1",
               ".bat", ".cmd", ".rb", ".pl", ".php", ".vbs"}
 
-_INVISIBLE = re.compile("[​-‏‪-‮⁠-⁤⁦-⁩]")
+_INVISIBLE = re.compile("[\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069]")
 _CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 _SECRET_ASSIGN = re.compile(r"(?i)\b([\w-]*(?:key|token|secret|passw\w*)\s*[:=]\s*)(['\"]?)[^\s'\"]+")
 _LONG_TOKEN = re.compile(r"(?=[\w+/=-]*\d)(?=[\w+/=-]*[A-Za-z])[\w+/=-]{20,}")
@@ -123,7 +97,7 @@ class _Scan:
 
     def add(self, rule, file, line, text=""):
         self.findings.setdefault((file, line or 0, rule), {
-            "rule": rule, "severity": RULES[rule][0], "file": file, "line": line, "snippet": snippet(text)})
+            "rule": rule, "severity": RULES[rule], "file": file, "line": line, "snippet": snippet(text)})
 
     def scan_text(self, rel, text, is_skill_md):
         lines = text.splitlines()
@@ -236,14 +210,14 @@ def scan_inventory(inventory):
         skill_dir = Path(skill["path"]).parent
         if not skill_dir.is_dir():
             warnings.append({"path": str(skill_dir), "code": "skill_missing",
-                             "message": "La carpeta de esta skill ya no existe."})
+                             "message": t("warn.skill_missing")})
             continue
         if skill_dir not in by_dir:
             try:
                 by_dir[skill_dir] = scan_skill(skill_dir)
             except OSError:
                 warnings.append({"path": str(skill_dir), "code": "skill_unreadable",
-                                 "message": "No se pudo revisar esta skill."})
+                                 "message": t("warn.skill_unscanned")})
                 continue
         results[skill["id"]] = {**by_dir[skill_dir], "self": is_self(skill_dir)}
 
@@ -253,7 +227,7 @@ def scan_inventory(inventory):
         try:
             plugins[pid] = scan_plugin(root)
         except OSError:
-            warnings.append({"path": str(root), "code": "plugin_unreadable", "message": "No se pudo revisar este plugin."})
+            warnings.append({"path": str(root), "code": "plugin_unreadable", "message": t("warn.plugin_unscanned")})
 
     def count(items):
         totals = {level: 0 for level in SEVERITY_ORDER}
@@ -264,9 +238,10 @@ def scan_inventory(inventory):
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "disclaimer": DISCLAIMER,
+        "disclaimer": t("disclaimer"),
         "allowed_domains": list(ALLOWED_DOMAINS),
-        "rules": [{"id": k, "severity": v[0], "title": v[1], "explanation": v[2]} for k, v in RULES.items()],
+        "rules": [{"id": k, "severity": sev, "title": t(f"rule.{k}.title"), "explanation": t(f"rule.{k}.text")}
+                  for k, sev in RULES.items()],
         "totals": count(results),
         "plugin_totals": count(plugins),
         "skills": results,

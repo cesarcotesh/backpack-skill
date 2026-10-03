@@ -116,7 +116,7 @@ dialog::backdrop { background: rgba(22, 32, 26, .45); }
 <body>
 <div class="shell">
   <aside class="side" aria-label="Menú">
-    <span class="wordmark">mochila<span>.</span></span>
+    <span class="wordmark" id="side-wordmark"></span>
     <nav aria-label="Secciones" id="side-nav"></nav>
     <div class="foot" id="side-foot"></div>
   </aside>
@@ -131,7 +131,135 @@ const D = JSON.parse(document.getElementById("data").textContent);
 const SK = new Map(D.skills.map(s => [s.id, s]));
 const PL = new Map(D.plugins.map(p => [p.id, p]));
 const RC = new Map(D.recipes.map(r => [r.id, r]));
-const fmt = n => Number(n).toLocaleString("es-CL");
+
+// --- every visible text, in Spanish and English (the review's language picks one)
+const LANG = D.lang === "en" ? "en" : "es";
+const fmt = n => Number(n).toLocaleString(LANG === "en" ? "en-US" : "es-CL");
+const TEXT = {
+  es: {
+    title: "Tu mochila · Backpack Skill", wordmark: "mochila", menu: "Menú", sections: "Secciones", sheet: "Ficha de la skill",
+    footer: "Cifras estimadas. Se cargan aunque nunca uses la skill.",
+    rec: { remove: "Quitar", review: "Revisar", merge: "Elegir una", tune: "Afinar", keep: "Conservar" },
+    mot: { self: "Esta herramienta", security: "Seguridad", copy: "Copia", unused: "Sin uso", variants: "Repetida", competes: "Compite",
+           greedy: "Se cuela", heavy: "Pesada", disabled: "Desactivada", keeper: "Tiene copias", ok: "Bien" },
+    noData: "Sin datos aquí", noUse: "Sin uso registrado", today: "Hoy", daysAgo: n => `Hace ${fmt(n)} días`,
+    filters: { pendientes: "Para revisar", "sin-uso": "Sin uso", copias: "Repetidas", compiten: "Compiten", "se-cuelan": "Se cuelan",
+               pesadas: "Pesadas", seguridad: "Seguridad", plugins: "Plugins", todas: "Todas" },
+    nav: { inicio: "Inicio", revisar: "Revisar", manual: "Manual", simulador: "Simulador", cambios: "Cambios" },
+    advanced: "Modo avanzado", simple: "Modo simple",
+    heavyBag: "Tu mochila pesa bastante.", lightBag: "Tu mochila está liviana.", loadLabel: "Carga actual",
+    loadEvery: "Claude carga esto en cada conversación", tokensSkills: n => `tokens · ${fmt(n)} skills`,
+    estimatedNote: "Estimado. Pesa aunque nunca uses la skill.",
+    ifRemove: n => `Si quitas lo sugerido, bajaría a ~${fmt(n)} tokens (estimado).`, whereWeight: "Dónde está el peso",
+    unusedN: n => `${fmt(n)} skills sin uso`, noneSince: d => `Ninguna se usó desde el ${d}`, noUseRecord: "No hay registro de uso",
+    copiesN: n => `${fmt(n)} copias exactas`, copiesSub: "La misma skill, instalada dos veces",
+    pairsN: n => `${fmt(n)} pares que compiten`, pairsSub: "Hacen casi lo mismo con otro nombre",
+    greedyN: n => `${fmt(n)} skills que se cuelan`, greedySub: "Piden ir antes que todas",
+    heavyN: n => `${fmt(n)} con descripción pesada`, heavySub: "Ocupan mucho en cada conversación",
+    security: "Seguridad", riskyN: n => `${fmt(n)} con algo serio para revisar`, riskyNone: "Nada serio en la revisión automática",
+    startReview: "Empezar la revisión", review: "Revisión", progress: "Avance de la revisión",
+    reviewedOf: (a, b) => `${fmt(a)} de ${fmt(b)} revisadas`, allDone: "¡Listo!",
+    allDoneText: "Revisaste todo lo sugerido. Mira el resumen en Cambios.", seeChanges: "Ver cambios",
+    loadIfRemoved: "Carga si la quitas", remove: "Quitar", details: "Ficha", view: "Ver", keep: "Conservar",
+    nothingDeleted: "Nada se borra todavía: solo vas armando tu lista en Cambios.",
+    fixedWeight: "Peso fijo", whenActive: "Al activarse", lastUse: "Último uso", suggestion: "Sugerencia",
+    partOfPlugin: name => `Es parte del plugin ${name}: se quita el plugin completo.`,
+    pluginWith: n => `Plugin con ${fmt(n)} ${n === 1 ? "skill" : "skills"}.`,
+    installedN: n => `Revisión · ${fmt(n)} skills instaladas`,
+    statFixed: "tokens fijos", statFixedSub: "por conversación, estimado", statInstalled: "skills instaladas",
+    statInstalledSub: "en todas las carpetas", statUnused: "sin uso registrado", since: d => `desde el ${d}`, noUsageData: "sin datos de uso",
+    statFree: "tokens que puedes liberar", statFreeSub: "con lo sugerido, estimado",
+    thPlugin: "Plugin", thOrigin: "Origen", thSkills: "Skills", thDecision: "Tu decisión", thSkill: "Skill", thReason: "Motivo",
+    markedRemove: "Marcada para quitar", showing: (a, b) => `Mostrando ${fmt(a)} de ${fmt(b)} · cifras en tokens, estimadas`,
+    showMore: "Mostrar más", skillsToReview: "Skills para revisar",
+    howActivates: "Cómo se activa", toCall: "Para llamarla: ", whenClaude: "Cuándo la usa Claude", needs: "Necesita",
+    nothingSpecial: "Nada especial declarado.", whenNot: "Cuándo no usarla", whenNotNone: "Sin datos aquí: su autor no lo dice.",
+    inRecipes: "Aparece en recetas", claudeNote: "Explicación de Claude", original: "Descripción original (texto de la skill)",
+    noDescription: "Sin descripción.", removePlugin: name => `Quitar el plugin ${name}`, close: "Cerrar",
+    simPlaceholder: "Ej.: revisa mi código antes de subirlo", prediction: "Predicción, no garantía",
+    simNone: "Ninguna skill parece responder", simOne: "1 skill responde a este pedido", simMany: n => `${n} skills compiten por este pedido`,
+    high: "Alta", medium: "Media", simNoneNote: "Claude respondería sin usar ninguna skill. Prueba con otras palabras.",
+    simOneNote: "Solo una skill encaja: no hay choque.",
+    simManyNote: n => `Quédate con una para esto. Mientras haya ${n}, van a competir cada vez que lo pidas.`,
+    simTitle: "¿Quién responde?", simIntro: "Escribe algo que le pedirías a Claude y mira qué skill se activaría.",
+    yourRequest: "Tu pedido", tryIt: "Probar", copy: "Copiar", copied: "Copiado", recipe: "Receta", withCmd: c => `Con ${c}`,
+    howToAsk: "Cómo pedirlo", whenNotNoneMany: "Sin datos aquí: sus autores no lo dicen.", manualPlaceholder: "Ej.: cerrar el mes",
+    recipesSkills: (r, n) => `${r} ${r === 1 ? "receta" : "recetas"} · ${n} skills`,
+    youHaveRecipes: n => `Tienes ${fmt(n)} recetas: skills que se llaman entre sí. Busca por lo que quieres lograr.`,
+    manualTitle: "Manual", whatDo: "¿Qué quieres hacer?", allRecipes: "← Todas las recetas", skillsTitle: "Skills",
+    pluginLabel: name => `Plugin ${name}`, originTokens: (o, n) => `${o} · ~${fmt(n)} tokens fijos`,
+    undo: "Deshacer", didIt: "Ya lo quité", claudeListIntro: "Quiero quitar estas skills y plugins. Guíame paso a paso:\n",
+    copyForClaude: "Copiar la lista para Claude", changesTitle: "Cambios",
+    changesNote: "Nada se borra solo. Sigue los pasos de cada una y marca «Ya lo quité». Después vuelve a pedirle a Claude que revise tus skills para ver la mochila más liviana.",
+    toRemove: "Para quitar", toRemoveN: n => `Para quitar (${fmt(n)})`,
+    freed: (f, d, n) => `Liberarías ~${fmt(f)} tokens en cada conversación (estimado). Llevas ${fmt(d)} de ${fmt(n)}.`,
+    noneToRemove: "Aún no marcaste nada para quitar.", toKeep: "Para conservar", toKeepN: n => `Para conservar (${fmt(n)})`,
+    noneToKeep: "Aún no marcaste nada para conservar.", confirmReset: "¿Borrar todas tus marcas?", startOver: "Empezar de cero",
+  },
+  en: {
+    title: "Your backpack · Backpack Skill", wordmark: "backpack", menu: "Menu", sections: "Sections", sheet: "Skill details",
+    footer: "Estimated figures. They load even if you never use the skill.",
+    rec: { remove: "Remove", review: "Review", merge: "Pick one", tune: "Tune", keep: "Keep" },
+    mot: { self: "This tool", security: "Security", copy: "Copy", unused: "Unused", variants: "Duplicate", competes: "Overlaps",
+           greedy: "Barges in", heavy: "Heavy", disabled: "Turned off", keeper: "Has copies", ok: "Fine" },
+    noData: "No data here", noUse: "No recorded use", today: "Today", daysAgo: n => `${fmt(n)} days ago`,
+    filters: { pendientes: "To review", "sin-uso": "Unused", copias: "Duplicates", compiten: "Overlap", "se-cuelan": "Barge in",
+               pesadas: "Heavy", seguridad: "Security", plugins: "Plugins", todas: "All" },
+    nav: { inicio: "Home", revisar: "Review", manual: "Manual", simulador: "Simulator", cambios: "Changes" },
+    advanced: "Advanced mode", simple: "Simple mode",
+    heavyBag: "Your backpack is heavy.", lightBag: "Your backpack is light.", loadLabel: "Current load",
+    loadEvery: "Claude loads this in every conversation", tokensSkills: n => `tokens · ${fmt(n)} skills`,
+    estimatedNote: "Estimated. It weighs even if you never use the skill.",
+    ifRemove: n => `If you remove what's suggested, it would drop to ~${fmt(n)} tokens (estimated).`, whereWeight: "Where the weight is",
+    unusedN: n => `${fmt(n)} unused skills`, noneSince: d => `None used since ${d}`, noUseRecord: "No usage records",
+    copiesN: n => `${fmt(n)} exact copies`, copiesSub: "The same skill, installed twice",
+    pairsN: n => `${fmt(n)} overlapping pairs`, pairsSub: "They do almost the same under another name",
+    greedyN: n => `${fmt(n)} skills that barge in`, greedySub: "They ask to go before all others",
+    heavyN: n => `${fmt(n)} with heavy descriptions`, heavySub: "They take a lot in every conversation",
+    security: "Security", riskyN: n => `${fmt(n)} with something serious to check`, riskyNone: "Nothing serious in the automated review",
+    startReview: "Start the review", review: "Review", progress: "Review progress",
+    reviewedOf: (a, b) => `${fmt(a)} of ${fmt(b)} reviewed`, allDone: "All done!",
+    allDoneText: "You went through every suggestion. See the summary in Changes.", seeChanges: "See changes",
+    loadIfRemoved: "Load if you remove it", remove: "Remove", details: "Details", view: "View", keep: "Keep",
+    nothingDeleted: "Nothing is deleted yet: you're just building your list in Changes.",
+    fixedWeight: "Fixed weight", whenActive: "When active", lastUse: "Last used", suggestion: "Suggestion",
+    partOfPlugin: name => `It's part of the ${name} plugin: the whole plugin is removed.`,
+    pluginWith: n => `Plugin with ${fmt(n)} ${n === 1 ? "skill" : "skills"}.`,
+    installedN: n => `Review · ${fmt(n)} installed skills`,
+    statFixed: "fixed tokens", statFixedSub: "per conversation, estimated", statInstalled: "installed skills",
+    statInstalledSub: "across all folders", statUnused: "with no recorded use", since: d => `since ${d}`, noUsageData: "no usage data",
+    statFree: "tokens you can free", statFreeSub: "with the suggestions, estimated",
+    thPlugin: "Plugin", thOrigin: "Origin", thSkills: "Skills", thDecision: "Your decision", thSkill: "Skill", thReason: "Reason",
+    markedRemove: "Marked for removal", showing: (a, b) => `Showing ${fmt(a)} of ${fmt(b)} · token figures, estimated`,
+    showMore: "Show more", skillsToReview: "Skills to review",
+    howActivates: "How it activates", toCall: "To call it: ", whenClaude: "When Claude uses it", needs: "Needs",
+    nothingSpecial: "Nothing special declared.", whenNot: "When not to use it", whenNotNone: "No data here: its author doesn't say.",
+    inRecipes: "Appears in recipes", claudeNote: "Claude's explanation", original: "Original description (the skill's own text)",
+    noDescription: "No description.", removePlugin: name => `Remove the ${name} plugin`, close: "Close",
+    simPlaceholder: "E.g.: review my code before I push it", prediction: "A prediction, not a guarantee",
+    simNone: "No skill seems to answer", simOne: "1 skill answers this request", simMany: n => `${n} skills compete for this request`,
+    high: "High", medium: "Medium", simNoneNote: "Claude would answer without any skill. Try other words.",
+    simOneNote: "Only one skill fits: no clash.",
+    simManyNote: n => `Keep just one for this. While there are ${n}, they'll compete every time you ask.`,
+    simTitle: "Who answers?", simIntro: "Type something you'd ask Claude and see which skill would activate.",
+    yourRequest: "Your request", tryIt: "Try", copy: "Copy", copied: "Copied", recipe: "Recipe", withCmd: c => `With ${c}`,
+    howToAsk: "How to ask for it", whenNotNoneMany: "No data here: their authors don't say.", manualPlaceholder: "E.g.: close the month",
+    recipesSkills: (r, n) => `${r} ${r === 1 ? "recipe" : "recipes"} · ${n} skills`,
+    youHaveRecipes: n => `You have ${fmt(n)} recipes: skills that call each other. Search by what you want to get done.`,
+    manualTitle: "Manual", whatDo: "What do you want to do?", allRecipes: "← All recipes", skillsTitle: "Skills",
+    pluginLabel: name => `Plugin ${name}`, originTokens: (o, n) => `${o} · ~${fmt(n)} fixed tokens`,
+    undo: "Undo", didIt: "I removed it", claudeListIntro: "I want to remove these skills and plugins. Guide me step by step:\n",
+    copyForClaude: "Copy the list for Claude", changesTitle: "Changes",
+    changesNote: "Nothing gets deleted on its own. Follow the steps for each one and tick “I removed it”. Then ask Claude to review your skills again to see a lighter backpack.",
+    toRemove: "To remove", toRemoveN: n => `To remove (${fmt(n)})`,
+    freed: (f, d, n) => `You'd free ~${fmt(f)} tokens in every conversation (estimated). Done: ${fmt(d)} of ${fmt(n)}.`,
+    noneToRemove: "You haven't marked anything to remove yet.", toKeep: "To keep", toKeepN: n => `To keep (${fmt(n)})`,
+    noneToKeep: "You haven't marked anything to keep yet.", confirmReset: "Clear all your marks?", startOver: "Start over",
+  },
+};
+const T = TEXT[LANG];
+document.documentElement.lang = LANG;
+document.title = T.title;
 
 // --- storage: per-viewer marks; the page must work when it is unavailable
 const store = {
@@ -194,14 +322,14 @@ function backpackArt() {
 }
 
 // --- derived facts
-const REC = { remove: "Quitar", review: "Revisar", merge: "Elegir una", tune: "Afinar", keep: "Conservar" };
+const REC = T.rec;
 const MOTIVES = [  // first matching reason code names the row
-  ["self", "Esta herramienta", "green"], ["security_high", "Seguridad", "orange"], ["exact_copy_extra", "Copia", "mustard"], ["unused", "Sin uso", "outline"],
-  ["same_name_variants", "Repetida", "mustard"], ["competes", "Compite", ""], ["greedy", "Se cuela", "orange"],
-  ["security_medium", "Seguridad", "mustard"], ["heavy_fixed", "Pesada", "outline"], ["heavy_body", "Pesada", "outline"],
-  ["disabled", "Desactivada", ""], ["exact_copy_keeper", "Tiene copias", ""],
+  ["self", T.mot.self, "green"], ["security_high", T.mot.security, "orange"], ["exact_copy_extra", T.mot.copy, "mustard"], ["unused", T.mot.unused, "outline"],
+  ["same_name_variants", T.mot.variants, "mustard"], ["competes", T.mot.competes, ""], ["greedy", T.mot.greedy, "orange"],
+  ["security_medium", T.mot.security, "mustard"], ["heavy_fixed", T.mot.heavy, "outline"], ["heavy_body", T.mot.heavy, "outline"],
+  ["disabled", T.mot.disabled, ""], ["exact_copy_keeper", T.mot.keeper, ""],
 ];
-function motive(s) { for (const [code, label, cls] of MOTIVES) if (s.codes.includes(code)) return [label, cls]; return ["Bien", "green"]; }
+function motive(s) { for (const [code, label, cls] of MOTIVES) if (s.codes.includes(code)) return [label, cls]; return [T.mot.ok, "green"]; }
 function mainReason(s) { for (const [code] of MOTIVES) { const i = s.codes.indexOf(code); if (i >= 0) return i; } return 0; }
 const removable = s => s.rec === "remove" && s.codes.includes("unused");
 function plugOf(s) { return s.plugin ? PL.get(s.plugin) : null; }
@@ -210,33 +338,33 @@ function markedRemoved(s) { return marks[markKey(s)] === "remove"; }
 function currentLoad() { return D.skills.reduce((t, s) => t + (markedRemoved(s) ? 0 : s.fixed), 0); }
 function lastUse(s) {
   const u = s.usage;
-  if (!u) return "Sin datos aquí";
-  if (!u.count) return "Sin uso registrado";
-  return u.days_unused === 0 ? "Hoy" : `Hace ${fmt(u.days_unused)} días`;
+  if (!u) return T.noData;
+  if (!u.count) return T.noUse;
+  return u.days_unused === 0 ? T.today : T.daysAgo(u.days_unused);
 }
 const FILTERS = [
-  ["pendientes", "Para revisar", s => s.rec !== "keep"],
-  ["sin-uso", "Sin uso", s => s.codes.includes("unused") && s.rec === "remove"],
-  ["copias", "Repetidas", s => s.codes.includes("exact_copy_extra") || s.codes.includes("same_name_variants")],
-  ["compiten", "Compiten", s => s.codes.includes("competes")],
-  ["se-cuelan", "Se cuelan", s => s.codes.includes("greedy")],
-  ["pesadas", "Pesadas", s => s.codes.includes("heavy_fixed") || s.codes.includes("heavy_body")],
-  ["seguridad", "Seguridad", s => s.codes.some(c => c.startsWith("security_"))],
-  ["plugins", "Plugins", null],
-  ["todas", "Todas", () => true],
+  ["pendientes", T.filters.pendientes, s => s.rec !== "keep"],
+  ["sin-uso", T.filters["sin-uso"], s => s.codes.includes("unused") && s.rec === "remove"],
+  ["copias", T.filters.copias, s => s.codes.includes("exact_copy_extra") || s.codes.includes("same_name_variants")],
+  ["compiten", T.filters.compiten, s => s.codes.includes("competes")],
+  ["se-cuelan", T.filters["se-cuelan"], s => s.codes.includes("greedy")],
+  ["pesadas", T.filters.pesadas, s => s.codes.includes("heavy_fixed") || s.codes.includes("heavy_body")],
+  ["seguridad", T.filters.seguridad, s => s.codes.some(c => c.startsWith("security_"))],
+  ["plugins", T.filters.plugins, null],
+  ["todas", T.filters.todas, () => true],
 ];
 
 // --- shell
-const SECTIONS = [["inicio", "Inicio", "home"], ["revisar", "Revisar", "bag"], ["manual", "Manual", "book"], ["simulador", "Simulador", "target"], ["cambios", "Cambios", "history"]];
+const SECTIONS = [["inicio", T.nav.inicio, "home"], ["revisar", T.nav.revisar, "bag"], ["manual", T.nav.manual, "book"], ["simulador", T.nav.simulador, "target"], ["cambios", T.nav.cambios, "history"]];
 function navLinks(current, bottom) {
   return SECTIONS.map(([id, label, ic]) => h("a", { href: "#" + id, "aria-current": id === current ? "page" : null },
     bottom ? h("span", { class: "pill" }, icon(ic, 22)) : icon(ic, 20), label));
 }
 function modeToggle() {
   return h("button", { type: "button", class: "toggle", "aria-pressed": advanced, onclick: () => { advanced = !advanced; store.set("advanced", advanced); route(); } },
-    h("span", { class: "switch" }), advanced ? "Modo avanzado" : "Modo simple");
+    h("span", { class: "switch" }), advanced ? T.advanced : T.simple);
 }
-function topbar() { return h("div", { class: "topbar" }, h("span", { class: "wordmark" }, "mochila", h("span", null, ".")), modeToggle()); }
+function topbar() { return h("div", { class: "topbar" }, h("span", { class: "wordmark" }, T.wordmark, h("span", null, ".")), modeToggle()); }
 
 // --- screens
 function screenHome() {
@@ -254,26 +382,26 @@ function screenHome() {
     right ? h("span", { class: "small bold" }, right) : icon("chevron", 18, "#4C5A51"));
   return [
     topbar(),
-    h("h1", null, load > 10000 ? "Tu mochila pesa bastante." : "Tu mochila está liviana."),
-    h("section", { class: "card", "aria-label": "Carga actual", style: "display:flex;align-items:center;gap:12px" },
+    h("h1", null, load > 10000 ? T.heavyBag : T.lightBag),
+    h("section", { class: "card", "aria-label": T.loadLabel, style: "display:flex;align-items:center;gap:12px" },
       h("div", { class: "grow", style: "gap:6px" },
-        h("span", { class: "small muted" }, "Claude carga esto en cada conversación"),
+        h("span", { class: "small muted" }, T.loadEvery),
         h("span", { class: "big" }, fmt(load)),
-        h("span", { class: "bold" }, `tokens · ${fmt(t.skills)} skills`),
-        h("span", { class: "tiny muted" }, "Estimado. Pesa aunque nunca uses la skill.")),
+        h("span", { class: "bold" }, T.tokensSkills(t.skills)),
+        h("span", { class: "tiny muted" }, T.estimatedNote)),
       backpackArt()),
-    t.savings ? h("p", { class: "note" }, `Si quitas lo sugerido, bajaría a ~${fmt(t.fixed_tokens_after_removals)} tokens (estimado).`) : null,
-    h("h2", null, "Dónde está el peso"),
+    t.savings ? h("p", { class: "note" }, T.ifRemove(t.fixed_tokens_after_removals)) : null,
+    h("h2", null, T.whereWeight),
     h("div", { class: "stack" },
-      unused.length ? row("#revisar/sin-uso", "#F2581D", "clock", `${fmt(unused.length)} skills sin uso`,
-        t.usage_history_since ? `Ninguna se usó desde el ${t.usage_history_since}` : "No hay registro de uso", `~${fmt(sum(unused))} tk`) : null,
-      copies.length ? row("#revisar/copias", "#E9B425", "copy", `${fmt(copies.length)} copias exactas`, "La misma skill, instalada dos veces", `~${fmt(sum(copies))} tk`) : null,
-      D.competing.length ? row("#revisar/compiten", "#DCE3DC", "swap", `${fmt(D.competing.length)} pares que compiten`, "Hacen casi lo mismo con otro nombre") : null,
-      greedy.length ? row("#revisar/se-cuelan", "#F2581D", "arrow", `${fmt(greedy.length)} skills que se cuelan`, "Piden ir antes que todas") : null,
-      heavy.length ? row("#revisar/pesadas", "#DCE3DC", "weight", `${fmt(heavy.length)} con descripción pesada`, "Ocupan mucho en cada conversación", `~${fmt(sum(heavy))} tk`) : null,
-      row("#revisar/seguridad", "#2E6B4E", "shield", "Seguridad",
-        risky.length ? `${fmt(risky.length)} con algo serio para revisar` : "Nada serio en la revisión automática", null, "#FFFFFF")),
-    h("a", { class: "btn primary wide", href: "#revisar" }, "Empezar la revisión", icon("arrow", 20)),
+      unused.length ? row("#revisar/sin-uso", "#F2581D", "clock", T.unusedN(unused.length),
+        t.usage_history_since ? T.noneSince(t.usage_history_since) : T.noUseRecord, `~${fmt(sum(unused))} tk`) : null,
+      copies.length ? row("#revisar/copias", "#E9B425", "copy", T.copiesN(copies.length), T.copiesSub, `~${fmt(sum(copies))} tk`) : null,
+      D.competing.length ? row("#revisar/compiten", "#DCE3DC", "swap", T.pairsN(D.competing.length), T.pairsSub) : null,
+      greedy.length ? row("#revisar/se-cuelan", "#F2581D", "arrow", T.greedyN(greedy.length), T.greedySub) : null,
+      heavy.length ? row("#revisar/pesadas", "#DCE3DC", "weight", T.heavyN(heavy.length), T.heavySub, `~${fmt(sum(heavy))} tk`) : null,
+      row("#revisar/seguridad", "#2E6B4E", "shield", T.security,
+        risky.length ? T.riskyN(risky.length) : T.riskyNone, null, "#FFFFFF")),
+    h("a", { class: "btn primary wide", href: "#revisar" }, T.startReview, icon("arrow", 20)),
     h("p", { class: "tiny muted" }, D.disclaimer),
   ];
 }
@@ -292,26 +420,26 @@ function screenReviewSimple() {
   const keyOf = it => it.kind === "plugin" ? "P:" + it.id : it.id;
   const pending = all.filter(it => !marks[keyOf(it)]);
   const done = all.length - pending.length;
-  const head = [topbar(), h("h1", null, "Revisión"),
-    h("div", { class: "progress", role: "progressbar", "aria-label": "Avance de la revisión", "aria-valuemin": 0, "aria-valuemax": all.length, "aria-valuenow": done },
+  const head = [topbar(), h("h1", null, T.review),
+    h("div", { class: "progress", role: "progressbar", "aria-label": T.progress, "aria-valuemin": 0, "aria-valuemax": all.length, "aria-valuenow": done },
       h("div", { style: `width:${all.length ? (100 * done / all.length) : 100}%` })),
-    h("span", { class: "small muted" }, `${fmt(done)} de ${fmt(all.length)} revisadas`)];
-  if (!pending.length) return [...head, h("div", { class: "card stack" }, h("h2", null, "¡Listo!"),
-    h("p", null, "Revisaste todo lo sugerido. Mira el resumen en Cambios."), h("a", { class: "btn primary", href: "#cambios" }, "Ver cambios"))];
+    h("span", { class: "small muted" }, T.reviewedOf(done, all.length))];
+  if (!pending.length) return [...head, h("div", { class: "card stack" }, h("h2", null, T.allDone),
+    h("p", null, T.allDoneText), h("a", { class: "btn primary", href: "#cambios" }, T.seeChanges))];
   const it = pending[0], key = keyOf(it), load = currentLoad();
   const decide = v => { marks[key] = v; saveMarks(); route(); };
   const body = it.kind === "plugin" ? pluginCard(PL.get(it.id)) : skillCard(SK.get(it.id));
   return [...head,
     h("div", { class: "card", style: "display:flex;justify-content:space-between;align-items:baseline;gap:8px" },
-      h("span", { class: "small muted" }, "Carga si la quitas"),
+      h("span", { class: "small muted" }, T.loadIfRemoved),
       h("span", null, h("s", { class: "muted" }, fmt(load)), " ", h("span", { class: "bold" }, fmt(load - it.fixed)), " tokens")),
     h("article", { class: "card stack", style: "gap:14px" }, body),
     h("div", { class: "actions3" },
-      h("button", { type: "button", class: "btn remove", onclick: () => decide("remove") }, icon("x", 18), "Quitar"),
-      it.kind === "skill" ? h("button", { type: "button", class: "btn", onclick: () => openSheet(it.id) }, icon("eye", 18), "Ficha")
-        : h("a", { class: "btn", href: "#revisar/plugins" }, icon("eye", 18), "Ver"),
-      h("button", { type: "button", class: "btn keep", onclick: () => decide("keep") }, icon("check", 18), "Conservar")),
-    h("p", { class: "tiny muted" }, "Nada se borra todavía: solo vas armando tu lista en Cambios."),
+      h("button", { type: "button", class: "btn remove", onclick: () => decide("remove") }, icon("x", 18), T.remove),
+      it.kind === "skill" ? h("button", { type: "button", class: "btn", onclick: () => openSheet(it.id) }, icon("eye", 18), T.details)
+        : h("a", { class: "btn", href: "#revisar/plugins" }, icon("eye", 18), T.view),
+      h("button", { type: "button", class: "btn keep", onclick: () => decide("keep") }, icon("check", 18), T.keep)),
+    h("p", { class: "tiny muted" }, T.nothingDeleted),
   ];
 }
 function tags(s) {
@@ -325,11 +453,11 @@ function skillCard(s) {
       h("p", null, s.card.what)),
     s.reasons.length ? h("p", { class: "note" }, s.reasons[mainReason(s)]) : null,
     h("dl", { class: "facts" },
-      h("div", null, h("dt", null, "Peso fijo"), h("dd", null, `~${fmt(s.fixed)} tokens`)),
-      h("div", null, h("dt", null, "Al activarse"), h("dd", null, `~${fmt(s.body)} tokens`)),
-      h("div", null, h("dt", null, "Último uso"), h("dd", null, lastUse(s))),
-      h("div", null, h("dt", null, "Sugerencia"), h("dd", null, REC[s.rec]))),
-    plugOf(s) ? h("p", { class: "small muted" }, `Es parte del plugin ${plugOf(s).name}: se quita el plugin completo.`) : null,
+      h("div", null, h("dt", null, T.fixedWeight), h("dd", null, `~${fmt(s.fixed)} tokens`)),
+      h("div", null, h("dt", null, T.whenActive), h("dd", null, `~${fmt(s.body)} tokens`)),
+      h("div", null, h("dt", null, T.lastUse), h("dd", null, lastUse(s))),
+      h("div", null, h("dt", null, T.suggestion), h("dd", null, REC[s.rec]))),
+    plugOf(s) ? h("p", { class: "small muted" }, T.partOfPlugin(plugOf(s).name)) : null,
   ];
 }
 function pluginCard(p) {
@@ -337,11 +465,11 @@ function pluginCard(p) {
   return [
     h("div", { class: "wrap", style: "gap:8px" }, h("span", { class: `tag ${p.light}` }, REC[p.rec]), h("span", { class: "tag outline" }, p.origin)),
     h("div", { class: "stack", style: "gap:6px" }, h("h2", { class: "mono", style: "font-size:22px" }, p.name),
-      h("p", null, `Plugin con ${fmt(n)} ${n === 1 ? "skill" : "skills"}.`)),
+      h("p", null, T.pluginWith(n))),
     p.reasons.map(r => h("p", { class: "note" }, r)),
     h("dl", { class: "facts" },
-      h("div", null, h("dt", null, "Peso fijo"), h("dd", null, `~${fmt(p.fixed)} tokens`)),
-      h("div", null, h("dt", null, "Skills"), h("dd", null, fmt(n)))),
+      h("div", null, h("dt", null, T.fixedWeight), h("dd", null, `~${fmt(p.fixed)} tokens`)),
+      h("div", null, h("dt", null, T.thSkills), h("dd", null, fmt(n)))),
     h("p", { class: "small muted" }, p.skills.slice(0, 12).map(id => SK.get(id).name).join(", ") + (n > 12 ? "…" : "")),
   ];
 }
@@ -354,44 +482,44 @@ function screenReviewTable(filterId) {
   const chips = h("div", { class: "wrap", style: "gap:6px" }, FILTERS.map(([id, label]) =>
     h("button", { type: "button", class: "chip", "aria-pressed": id === f[0], onclick: () => { shown = 150; location.hash = "#revisar/" + id; } }, label)));
   const header = h("div", { class: "wrap", style: "justify-content:space-between;align-items:flex-end" },
-    h("div", { class: "stack", style: "gap:6px" }, h("span", { class: "small muted bold" }, `Revisión · ${fmt(t.skills)} skills instaladas`),
-      h("h1", null, currentLoad() > 10000 ? "Tu mochila pesa bastante." : "Tu mochila está liviana.")),
+    h("div", { class: "stack", style: "gap:6px" }, h("span", { class: "small muted bold" }, T.installedN(t.skills)),
+      h("h1", null, currentLoad() > 10000 ? T.heavyBag : T.lightBag)),
     h("div", { class: "wrap desk-hide" }, modeToggle()));
   const stats = h("div", { class: "stats" },
-    h("div", { class: "card stat" }, h("div", { class: "num" }, fmt(currentLoad())), h("div", { class: "bold" }, "tokens fijos"), h("div", { class: "small muted" }, "por conversación, estimado")),
-    h("div", { class: "card stat" }, h("div", { class: "num" }, fmt(t.skills)), h("div", { class: "bold" }, "skills instaladas"), h("div", { class: "small muted" }, "en todas las carpetas")),
-    h("div", { class: "card stat" }, h("div", { class: "num" }, fmt(t.unused_skills)), h("div", { class: "bold" }, "sin uso registrado"),
-      h("div", { class: "small muted" }, t.usage_history_since ? `desde el ${t.usage_history_since}` : "sin datos de uso")),
-    h("div", { class: "card stat" }, h("div", { class: "num" }, `~${fmt(t.savings)}`), h("div", { class: "bold" }, "tokens que puedes liberar"), h("div", { class: "small muted" }, "con lo sugerido, estimado")));
+    h("div", { class: "card stat" }, h("div", { class: "num" }, fmt(currentLoad())), h("div", { class: "bold" }, T.statFixed), h("div", { class: "small muted" }, T.statFixedSub)),
+    h("div", { class: "card stat" }, h("div", { class: "num" }, fmt(t.skills)), h("div", { class: "bold" }, T.statInstalled), h("div", { class: "small muted" }, T.statInstalledSub)),
+    h("div", { class: "card stat" }, h("div", { class: "num" }, fmt(t.unused_skills)), h("div", { class: "bold" }, T.statUnused),
+      h("div", { class: "small muted" }, t.usage_history_since ? T.since(t.usage_history_since) : T.noUsageData)),
+    h("div", { class: "card stat" }, h("div", { class: "num" }, `~${fmt(t.savings)}`), h("div", { class: "bold" }, T.statFree), h("div", { class: "small muted" }, T.statFreeSub)));
   let table;
   if (f[0] === "plugins") {
     const rows = [...D.plugins].sort((a, b) => b.fixed - a.fixed);
-    table = h("table", null, h("thead", null, h("tr", null, h("th", null, "Plugin"), h("th", null, "Origen"), h("th", { class: "num" }, "Skills"), h("th", { class: "num" }, "Peso fijo"), h("th", null, "Sugerencia"), h("th", null, "Tu decisión"))),
+    table = h("table", null, h("thead", null, h("tr", null, h("th", null, T.thPlugin), h("th", null, T.thOrigin), h("th", { class: "num" }, T.thSkills), h("th", { class: "num" }, T.fixedWeight), h("th", null, T.suggestion), h("th", null, T.thDecision))),
       h("tbody", null, rows.map(p => h("tr", null,
         h("td", { class: "mono" }, p.name), h("td", { class: "muted" }, p.origin), h("td", { class: "num" }, fmt(p.skills.length)),
         h("td", { class: "num" }, `~${fmt(p.fixed)}`), h("td", { class: "bold" }, REC[p.rec], p.reasons.length ? h("div", { class: "tiny muted", style: "font-weight:400" }, p.reasons[0]) : null),
         h("td", null, decisionButtons("P:" + p.id))))));
   } else {
     const rows = D.skills.filter(f[2]).sort((a, b) => b.fixed - a.fixed || a.id.localeCompare(b.id));
-    table = [h("table", null, h("thead", null, h("tr", null, h("th", null, "Skill"), h("th", null, "Motivo"), h("th", null, "Origen"), h("th", { class: "num" }, "Peso fijo"), h("th", { class: "num" }, "Al activarse"), h("th", null, "Último uso"), h("th", null, "Sugerencia"))),
+    table = [h("table", null, h("thead", null, h("tr", null, h("th", null, T.thSkill), h("th", null, T.thReason), h("th", null, T.thOrigin), h("th", { class: "num" }, T.fixedWeight), h("th", { class: "num" }, T.whenActive), h("th", null, T.lastUse), h("th", null, T.suggestion))),
       h("tbody", null, rows.slice(0, shown).map(s => {
         const [label, cls] = motive(s);
         return h("tr", { class: s.id === selected ? "selected" : null },
           h("td", null, h("button", { type: "button", class: "linkish mono", "aria-pressed": s.id === selected, onclick: () => selectSkill(s.id) }, s.command)),
           h("td", null, h("span", { class: `tag ${cls}` }, label)), h("td", { class: "muted" }, s.origin),
           h("td", { class: "num" }, `~${fmt(s.fixed)}`), h("td", { class: "num" }, `~${fmt(s.body)}`),
-          h("td", { class: "muted" }, lastUse(s)), h("td", { class: "bold" }, markedRemoved(s) ? "Marcada para quitar" : REC[s.rec]));
+          h("td", { class: "muted" }, lastUse(s)), h("td", { class: "bold" }, markedRemoved(s) ? T.markedRemove : REC[s.rec]));
       }))),
-      h("span", { class: "tiny muted" }, `Mostrando ${fmt(Math.min(shown, rows.length))} de ${fmt(rows.length)} · cifras en tokens, estimadas`),
-      rows.length > shown ? h("button", { type: "button", class: "btn", onclick: () => { shown += 150; route(); } }, "Mostrar más") : null];
+      h("span", { class: "tiny muted" }, T.showing(Math.min(shown, rows.length), rows.length)),
+      rows.length > shown ? h("button", { type: "button", class: "btn", onclick: () => { shown += 150; route(); } }, T.showMore) : null];
   }
   const sel = selected && SK.get(selected);
   return [
     header, stats,
     h("div", { class: "split" },
-      h("section", { class: "card main-col stack", "aria-label": "Skills para revisar", style: "gap:14px" },
+      h("section", { class: "card main-col stack", "aria-label": T.skillsToReview, style: "gap:14px" },
         h("h2", null, f[1]), chips, h("div", { class: "table-box" }, table)),
-      sel && WIDE() ? h("aside", { class: "card side-col stack", "aria-label": "Ficha de la skill", style: "gap:14px" }, fullCard(sel)) : null),
+      sel && WIDE() ? h("aside", { class: "card side-col stack", "aria-label": T.sheet, style: "gap:14px" }, fullCard(sel)) : null),
   ];
 }
 function selectSkill(id) {
@@ -401,8 +529,8 @@ function selectSkill(id) {
 function decisionButtons(key) {
   const set = v => { if (marks[key] === v) delete marks[key]; else marks[key] = v; saveMarks(); route(); };
   return h("div", { class: "wrap", style: "gap:6px" },
-    h("button", { type: "button", class: "chip", "aria-pressed": marks[key] === "remove", onclick: () => set("remove") }, "Quitar"),
-    h("button", { type: "button", class: "chip", "aria-pressed": marks[key] === "keep", onclick: () => set("keep") }, "Conservar"));
+    h("button", { type: "button", class: "chip", "aria-pressed": marks[key] === "remove", onclick: () => set("remove") }, T.remove),
+    h("button", { type: "button", class: "chip", "aria-pressed": marks[key] === "keep", onclick: () => set("keep") }, T.keep));
 }
 function fullCard(s) {
   const c = s.card, key = markKey(s), p = plugOf(s);
@@ -411,28 +539,28 @@ function fullCard(s) {
   return [
     skillCard(s),
     s.reasons.length > 1 ? h("ul", { class: "small", style: "margin:0;padding-left:18px" }, s.reasons.filter((_, i) => i !== mainReason(s)).map(r => h("li", null, r))) : null,
-    h("div", { class: "stack", style: "gap:4px" }, h("h3", null, "Cómo se activa"), h("p", { class: "small" }, c.activation),
-      c.how_to_call ? h("p", { class: "small" }, "Para llamarla: ", h("span", { class: "mono" }, c.how_to_call)) : null),
-    s.triggers ? h("div", { class: "stack", style: "gap:4px" }, h("h3", null, "Cuándo la usa Claude"), h("p", { class: "small" }, s.triggers)) : null,
-    h("div", { class: "stack", style: "gap:4px" }, h("h3", null, "Necesita"),
-      c.needs.length ? h("div", { class: "wrap", style: "gap:6px" }, c.needs.map(n => h("span", { class: "tag" }, n))) : h("p", { class: "small muted" }, "Nada especial declarado.")),
-    h("div", { class: "stack", style: "gap:4px" }, h("h3", null, "Cuándo no usarla"), h("p", { class: "small" }, c.when_not || "Sin datos aquí: su autor no lo dice.")),
-    h("div", { class: "stack", style: "gap:4px" }, h("h3", null, "Seguridad"), h("p", { class: "small" }, c.risk)),
+    h("div", { class: "stack", style: "gap:4px" }, h("h3", null, T.howActivates), h("p", { class: "small" }, c.activation),
+      c.how_to_call ? h("p", { class: "small" }, T.toCall, h("span", { class: "mono" }, c.how_to_call)) : null),
+    s.triggers ? h("div", { class: "stack", style: "gap:4px" }, h("h3", null, T.whenClaude), h("p", { class: "small" }, s.triggers)) : null,
+    h("div", { class: "stack", style: "gap:4px" }, h("h3", null, T.needs),
+      c.needs.length ? h("div", { class: "wrap", style: "gap:6px" }, c.needs.map(n => h("span", { class: "tag" }, n))) : h("p", { class: "small muted" }, T.nothingSpecial)),
+    h("div", { class: "stack", style: "gap:4px" }, h("h3", null, T.whenNot), h("p", { class: "small" }, c.when_not || T.whenNotNone)),
+    h("div", { class: "stack", style: "gap:4px" }, h("h3", null, T.security), h("p", { class: "small" }, c.risk)),
     h("p", { class: "small muted" }, c.usage, " ", c.weight),
-    recipes.length ? h("div", { class: "stack", style: "gap:4px" }, h("h3", null, "Aparece en recetas"),
+    recipes.length ? h("div", { class: "stack", style: "gap:4px" }, h("h3", null, T.inRecipes),
       recipes.map(r => h("a", { href: "#manual/" + encodeURIComponent(r.id), class: "small", onclick: closeSheet }, r.steps.map(id => SK.get(id).command).join(" → ")))) : null,
-    c.claude_note ? h("div", { class: "claude" }, h("span", { class: "tiny bold muted" }, "Explicación de Claude"), h("p", { class: "small" }, c.claude_note)) : null,
-    h("details", { class: "small" }, h("summary", null, "Descripción original (texto de la skill)"), h("p", { class: "muted", style: "margin-top:6px;overflow-wrap:anywhere" }, s.description || "Sin descripción.")),
+    c.claude_note ? h("div", { class: "claude" }, h("span", { class: "tiny bold muted" }, T.claudeNote), h("p", { class: "small" }, c.claude_note)) : null,
+    h("details", { class: "small" }, h("summary", null, T.original), h("p", { class: "muted", style: "margin-top:6px;overflow-wrap:anywhere" }, s.description || T.noDescription)),
     h("div", { class: "wrap" },
-      h("button", { type: "button", class: "btn remove", style: "flex:1 1 140px", onclick: () => set("remove") }, icon("x", 18), p ? `Quitar el plugin ${p.name}` : "Quitar"),
-      h("button", { type: "button", class: "btn keep", style: "flex:1 1 140px", onclick: () => set("keep") }, icon("check", 18), "Conservar")),
+      h("button", { type: "button", class: "btn remove", style: "flex:1 1 140px", onclick: () => set("remove") }, icon("x", 18), p ? T.removePlugin(p.name) : T.remove),
+      h("button", { type: "button", class: "btn keep", style: "flex:1 1 140px", onclick: () => set("keep") }, icon("check", 18), T.keep)),
   ];
 }
 const sheet = document.getElementById("sheet");
 function openSheet(id) {
   const s = SK.get(id);
   sheet.replaceChildren(h("div", { class: "stack", style: "gap:14px;padding:24px" },
-    h("div", { style: "display:flex;justify-content:flex-end" }, h("button", { type: "button", class: "btn", "aria-label": "Cerrar", onclick: closeSheet }, icon("x", 18))),
+    h("div", { style: "display:flex;justify-content:flex-end" }, h("button", { type: "button", class: "btn", "aria-label": T.close, onclick: closeSheet }, icon("x", 18))),
     fullCard(s)));
   if (!sheet.open) sheet.showModal();
 }
@@ -479,7 +607,7 @@ function matchSkills(query, only) {
 
 let simQuery = "";
 function screenSimulator() {
-  const input = h("input", { id: "pedido", type: "text", value: simQuery, placeholder: "Ej.: revisa mi código antes de subirlo", autocomplete: "off" });
+  const input = h("input", { id: "pedido", type: "text", value: simQuery, placeholder: T.simPlaceholder, autocomplete: "off" });
   const run = () => { simQuery = input.value; route(); };
   input.addEventListener("keydown", e => { if (e.key === "Enter") run(); });
   const hits = simQuery ? matchSkills(simQuery, s => s.invocable).slice(0, 8) : [];
@@ -487,20 +615,20 @@ function screenSimulator() {
   if (simQuery) {
     const n = hits.length;
     result = [
-      h("div", { class: "stack", style: "gap:4px" }, h("span", { class: "small muted bold" }, "Predicción, no garantía"),
-        h("h2", null, n === 0 ? "Ninguna skill parece responder" : n === 1 ? "1 skill responde a este pedido" : `${n} skills compiten por este pedido`)),
+      h("div", { class: "stack", style: "gap:4px" }, h("span", { class: "small muted bold" }, T.prediction),
+        h("h2", null, n === 0 ? T.simNone : n === 1 ? T.simOne : T.simMany(n))),
       n ? h("ol", { class: "stack", style: "margin:0;padding:0;list-style:none" }, hits.map(({ s, ratio }) =>
         h("li", null, h("button", { type: "button", class: "row", onclick: () => openSheet(s.id) },
           h("span", { class: "grow" }, h("span", { class: "mono", style: "overflow-wrap:anywhere" }, s.command), h("span", { class: "small muted" }, s.origin)),
-          h("span", { class: `tag ${ratio >= 0.6 ? "orange" : "mustard"}` }, ratio >= 0.6 ? "Alta" : "Media"))))) : null,
-      h("p", { class: "note" }, n === 0 ? "Claude respondería sin usar ninguna skill. Prueba con otras palabras."
-        : n === 1 ? "Solo una skill encaja: no hay choque." : `Quédate con una para esto. Mientras haya ${n}, van a competir cada vez que lo pidas.`),
+          h("span", { class: `tag ${ratio >= 0.6 ? "orange" : "mustard"}` }, ratio >= 0.6 ? T.high : T.medium))))) : null,
+      h("p", { class: "note" }, n === 0 ? T.simNoneNote
+        : n === 1 ? T.simOneNote : T.simManyNote(n)),
     ];
   }
-  return [topbar(), h("h1", null, "¿Quién responde?"),
-    h("p", { class: "muted" }, "Escribe algo que le pedirías a Claude y mira qué skill se activaría."),
-    h("div", { class: "stack" }, h("label", { for: "pedido", class: "bold small" }, "Tu pedido"),
-      h("div", { style: "display:flex;gap:8px" }, input, h("button", { type: "button", class: "btn primary", onclick: run }, "Probar"))),
+  return [topbar(), h("h1", null, T.simTitle),
+    h("p", { class: "muted" }, T.simIntro),
+    h("div", { class: "stack" }, h("label", { for: "pedido", class: "bold small" }, T.yourRequest),
+      h("div", { style: "display:flex;gap:8px" }, input, h("button", { type: "button", class: "btn primary", onclick: run }, T.tryIt))),
     result];
 }
 
@@ -510,19 +638,19 @@ function recipeCard(r) {
   const needs = [...new Set(steps.flatMap(s => s.card.needs))];
   const whenNot = steps.map(s => s.card.when_not).find(Boolean);
   const how = steps[0].card.how_to_call;
-  const copy = h("button", { type: "button", class: "btn", onclick: () => copyText(how, copy) }, "Copiar");
+  const copy = h("button", { type: "button", class: "btn", onclick: () => copyText(how, copy) }, T.copy);
   return h("article", { class: "card stack", style: "gap:14px" },
-    h("div", { class: "stack", style: "gap:4px" }, h("span", { class: "tag mustard", style: "align-self:flex-start" }, "Receta"), h("h2", null, `Con ${steps[0].command}`)),
+    h("div", { class: "stack", style: "gap:4px" }, h("span", { class: "tag mustard", style: "align-self:flex-start" }, T.recipe), h("h2", null, T.withCmd(steps[0].command))),
     h("ol", { class: "steps" }, steps.map((s, i) => h("li", null, h("span", { class: "step-n" }, String(i + 1)),
       h("span", { class: "grow" }, h("button", { type: "button", class: "linkish mono", style: "min-height:0", onclick: () => openSheet(s.id) }, s.command), h("span", { class: "small muted" }, s.card.what))))),
     h("div", { class: "note", style: "display:flex;align-items:center;justify-content:space-between;gap:12px" },
-      h("span", { class: "grow" }, h("span", { class: "tiny bold muted" }, "Cómo pedirlo"), h("span", { class: "mono" }, how)), copy),
-    h("div", { class: "stack", style: "gap:4px" }, h("h3", null, "Necesita"),
-      needs.length ? h("div", { class: "wrap", style: "gap:6px" }, needs.map(n => h("span", { class: "tag" }, n))) : h("p", { class: "small muted" }, "Nada especial declarado.")),
-    h("div", { class: "stack", style: "gap:4px" }, h("h3", null, "Cuándo no usarla"), h("p", { class: "small" }, whenNot || "Sin datos aquí: sus autores no lo dicen.")));
+      h("span", { class: "grow" }, h("span", { class: "tiny bold muted" }, T.howToAsk), h("span", { class: "mono" }, how)), copy),
+    h("div", { class: "stack", style: "gap:4px" }, h("h3", null, T.needs),
+      needs.length ? h("div", { class: "wrap", style: "gap:6px" }, needs.map(n => h("span", { class: "tag" }, n))) : h("p", { class: "small muted" }, T.nothingSpecial)),
+    h("div", { class: "stack", style: "gap:4px" }, h("h3", null, T.whenNot), h("p", { class: "small" }, whenNot || T.whenNotNoneMany)));
 }
 function screenManual(focus) {
-  const input = h("input", { id: "buscar", type: "search", value: manualQuery, placeholder: "Ej.: cerrar el mes", autocomplete: "off" });
+  const input = h("input", { id: "buscar", type: "search", value: manualQuery, placeholder: T.manualPlaceholder, autocomplete: "off" });
   input.addEventListener("input", () => { manualQuery = input.value; clearTimeout(input._t); input._t = setTimeout(() => { route(); const el = document.getElementById("buscar"); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }, 250); });
   const focused = focus && RC.get(decodeURIComponent(focus));
   let body;
@@ -532,26 +660,26 @@ function screenManual(focus) {
     const score = new Map(hits.map(x => [x.s.id, x.m]));
     const recipes = D.recipes.map(r => [r, r.steps.reduce((t, id) => t + (score.get(id) || 0), 0)]).filter(x => x[1] > 0)
       .sort((a, b) => b[1] - a[1]).slice(0, 5).map(x => x[0]);
-    body = [h("span", { class: "small muted bold" }, `${recipes.length} ${recipes.length === 1 ? "receta" : "recetas"} · ${hits.length} skills`),
+    body = [h("span", { class: "small muted bold" }, T.recipesSkills(recipes.length, hits.length)),
       recipes.map(recipeCard),
-      hits.length ? h("h2", null, "Skills") : null,
+      hits.length ? h("h2", null, T.skillsTitle) : null,
       h("div", { class: "stack" }, hits.slice(0, 15).map(({ s }) => h("button", { type: "button", class: "row", onclick: () => openSheet(s.id) },
         h("span", { class: "grow" }, h("span", { class: "mono", style: "overflow-wrap:anywhere" }, s.command), h("span", { class: "small muted" }, s.card.what)),
         icon("chevron", 18, "#4C5A51"))))];
   } else {
-    body = [h("p", { class: "muted" }, `Tienes ${fmt(D.recipes.length)} recetas: skills que se llaman entre sí. Busca por lo que quieres lograr.`),
+    body = [h("p", { class: "muted" }, T.youHaveRecipes(D.recipes.length)),
       D.recipes.slice(0, 20).map(r => h("a", { class: "row", href: "#manual/" + encodeURIComponent(r.id) },
         h("span", { class: "grow" }, h("span", { class: "mono small", style: "overflow-wrap:anywhere" }, r.steps.map(id => SK.get(id).command).join(" → "))),
         icon("chevron", 18, "#4C5A51")))];
   }
-  return [topbar(), h("h1", null, "Manual"),
-    h("div", { class: "stack" }, h("label", { for: "buscar", class: "bold small" }, "¿Qué quieres hacer?"), input),
-    focused ? h("a", { href: "#manual", class: "small bold" }, "← Todas las recetas") : null, body];
+  return [topbar(), h("h1", null, T.manualTitle),
+    h("div", { class: "stack" }, h("label", { for: "buscar", class: "bold small" }, T.whatDo), input),
+    focused ? h("a", { href: "#manual", class: "small bold" }, T.allRecipes) : null, body];
 }
 
 let done = store.get("done", {});  // uninstall steps the person already did
 function codeLine(text) {
-  const copy = h("button", { type: "button", class: "chip", onclick: () => copyText(text, copy) }, "Copiar");
+  const copy = h("button", { type: "button", class: "chip", onclick: () => copyText(text, copy) }, T.copy);
   return h("div", { class: "note", style: "display:flex;align-items:center;gap:10px;padding:10px 12px" },
     h("span", { class: "mono small grow", style: "overflow-wrap:anywhere" }, text), copy);
 }
@@ -560,7 +688,7 @@ function screenChanges() {
   for (const [key, v] of Object.entries(marks)) {
     const item = key.startsWith("P:") ? PL.get(key.slice(2)) : SK.get(key);
     if (!item) continue;
-    (v === "remove" ? remove : keep).push({ key, label: key.startsWith("P:") ? `Plugin ${item.name}` : item.command,
+    (v === "remove" ? remove : keep).push({ key, label: key.startsWith("P:") ? T.pluginLabel(item.name) : item.command,
       origin: item.origin, fixed: item.fixed, guide: item.guide });
   }
   remove.sort((a, b) => b.fixed - a.fixed);
@@ -568,38 +696,38 @@ function screenChanges() {
   const undo = key => { delete marks[key]; delete done[key]; saveMarks(); store.set("done", done); route(); };
   const tick = (key, on) => { if (on) done[key] = true; else delete done[key]; store.set("done", done); route(); };
   const head = x => h("span", { class: "grow" }, h("span", { class: "mono", style: "overflow-wrap:anywhere" }, x.label),
-    h("span", { class: "small muted" }, `${x.origin} · ~${fmt(x.fixed)} tokens fijos`));
+    h("span", { class: "small muted" }, T.originTokens(x.origin, x.fixed)));
   const removeList = h("ol", { class: "stack", style: "margin:0;padding:0;list-style:none;gap:12px" }, remove.map(x => {
     const g = x.guide || {}, id = "done-" + x.key.replace(/[^\w-]/g, "_");
     return h("li", { class: "card stack", style: `background:var(--bg);gap:10px;${done[x.key] ? "opacity:.6" : ""}` },
       h("div", { style: "display:flex;align-items:center;gap:12px" }, head(x),
-        h("button", { type: "button", class: "chip", onclick: () => undo(x.key) }, "Deshacer")),
+        h("button", { type: "button", class: "chip", onclick: () => undo(x.key) }, T.undo)),
       g.how ? h("p", { class: "small" }, g.how) : null,
       g.command ? codeLine(g.command) : null,
       g.path ? codeLine(g.path) : null,
       h("label", { for: id, style: "display:flex;align-items:center;gap:10px;min-height:44px;font-weight:700" },
         h("input", { type: "checkbox", id, checked: !!done[x.key], style: "width:22px;height:22px",
-          onchange: e => tick(x.key, e.target.checked) }), "Ya lo quité"));
+          onchange: e => tick(x.key, e.target.checked) }), T.didIt));
   }));
   const pending = remove.filter(x => !done[x.key]);
-  const text = pending.length ? "Quiero quitar estas skills y plugins. Guíame paso a paso:\n" +
+  const text = pending.length ? T.claudeListIntro +
     pending.map(x => `- ${x.label} (${x.origin})${x.guide && x.guide.command ? `: ${x.guide.command}` : ""}${x.guide && x.guide.path ? `: ${x.guide.path}` : ""}`).join("\n") : "";
-  const copy = h("button", { type: "button", class: "btn primary", onclick: () => copyText(text, copy) }, icon("copy", 18), "Copiar la lista para Claude");
+  const copy = h("button", { type: "button", class: "btn primary", onclick: () => copyText(text, copy) }, icon("copy", 18), T.copyForClaude);
   const list = items => h("div", { class: "stack" }, items.map(x => h("div", { class: "row" }, head(x),
-    h("button", { type: "button", class: "chip", onclick: () => undo(x.key) }, "Deshacer"))));
-  return [topbar(), h("h1", null, "Cambios"),
-    h("p", { class: "note" }, "Nada se borra solo. Sigue los pasos de cada una y marca «Ya lo quité». Después vuelve a pedirle a Claude que revise tus skills para ver la mochila más liviana."),
-    h("section", { class: "card stack", "aria-label": "Para quitar" }, h("h2", null, `Para quitar (${fmt(remove.length)})`),
-      remove.length ? [h("p", { class: "bold" }, `Liberarías ~${fmt(freed)} tokens en cada conversación (estimado). Llevas ${fmt(remove.length - pending.length)} de ${fmt(remove.length)}.`),
+    h("button", { type: "button", class: "chip", onclick: () => undo(x.key) }, T.undo))));
+  return [topbar(), h("h1", null, T.changesTitle),
+    h("p", { class: "note" }, T.changesNote),
+    h("section", { class: "card stack", "aria-label": T.toRemove }, h("h2", null, T.toRemoveN(remove.length)),
+      remove.length ? [h("p", { class: "bold" }, T.freed(freed, remove.length - pending.length, remove.length)),
         removeList, pending.length ? h("div", { class: "wrap" }, copy) : null]
-        : h("p", { class: "muted" }, "Aún no marcaste nada para quitar.")),
-    h("section", { class: "card stack", "aria-label": "Para conservar" }, h("h2", null, `Para conservar (${fmt(keep.length)})`),
-      keep.length ? list(keep) : h("p", { class: "muted" }, "Aún no marcaste nada para conservar.")),
-    Object.keys(marks).length ? h("button", { type: "button", class: "btn", onclick: () => { if (confirm("¿Borrar todas tus marcas?")) { marks = {}; done = {}; saveMarks(); store.set("done", done); route(); } } }, "Empezar de cero") : null];
+        : h("p", { class: "muted" }, T.noneToRemove)),
+    h("section", { class: "card stack", "aria-label": T.toKeep }, h("h2", null, T.toKeepN(keep.length)),
+      keep.length ? list(keep) : h("p", { class: "muted" }, T.noneToKeep)),
+    Object.keys(marks).length ? h("button", { type: "button", class: "btn", onclick: () => { if (confirm(T.confirmReset)) { marks = {}; done = {}; saveMarks(); store.set("done", done); route(); } } }, T.startOver) : null];
 }
 
 function copyText(text, button) {
-  const done = () => { const old = button.textContent; button.textContent = "Copiado"; setTimeout(() => { button.textContent = old; }, 1500); };
+  const done = () => { const old = button.textContent; button.textContent = T.copied; setTimeout(() => { button.textContent = old; }, 1500); };
   if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, () => fallback());
   else fallback();
   function fallback() {
@@ -622,11 +750,15 @@ function route() {
   document.getElementById("main").replaceChildren(...[view].flat(Infinity).filter(Boolean));
   document.getElementById("side-nav").replaceChildren(...navLinks(current, false));
   document.getElementById("bottom-nav").replaceChildren(...navLinks(current, true));
-  document.getElementById("side-foot").replaceChildren(modeToggle(), h("span", null, "Cifras estimadas. Se cargan aunque nunca uses la skill."));
+  document.getElementById("side-foot").replaceChildren(modeToggle(), h("span", null, T.footer));
 }
 let lastRoute = "";
 addEventListener("hashchange", () => { const r = location.hash.split("/")[0]; if (r !== lastRoute) { window.scrollTo(0, 0); lastRoute = r; } route(); });
 sheet.addEventListener("close", () => sheet.replaceChildren());
+document.querySelector(".side").setAttribute("aria-label", T.menu);
+for (const nav of document.querySelectorAll("nav")) nav.setAttribute("aria-label", T.sections);
+sheet.setAttribute("aria-label", T.sheet);
+document.getElementById("side-wordmark").replaceChildren(T.wordmark, h("span", null, "."));
 route();
 </script>
 </body>

@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 
 from .audit import STOPWORDS
+from .i18n import lang, t
 from .inventory import plain
 
 TEMPLATE = Path(__file__).with_name("app_template.html")
@@ -30,13 +31,13 @@ FONT_FILES = {
 def origin_label(skill):
     o, plugin = skill["origin"], skill.get("plugin")
     if o["type"] == "claude.ai":
-        return "Tu cuenta de claude.ai"
+        return t("origin.claude_ai")
+    if o["type"] == "platform":
+        return t("origin.platform")
     if o["type"] == "plugin":
-        where = "Plugin de la app" if o.get("via") == "app" else "Plugin"
-        return f"{where} · {plugin['name']}"
-    labels = {"npx-skills": "Instalada con npx", "git": "Clonada con git", "symlink": "Enlace a otra carpeta"}
-    scope = "personal" if skill["scope"] == "personal" else "de proyecto"
-    return labels.get(o["type"], f"Carpeta {scope}, origen desconocido")
+        return t("origin.app_plugin" if o.get("via") == "app" else "origin.plugin", name=plugin["name"])
+    labels = {"npx-skills": "origin.npx", "git": "origin.git", "symlink": "origin.symlink"}
+    return t(labels.get(o["type"], "origin.unknown_personal" if skill["scope"] == "personal" else "origin.unknown_project"))
 
 
 def home_path(path, home):
@@ -55,30 +56,30 @@ def guide(skill, home):
     o, plugin = skill["origin"], skill.get("plugin") or {}
     folder = home_path(Path(plain(skill["path"])).parent, home)
     if o["type"] == "claude.ai":
-        return {"how": f"En claude.ai abre Customize > Skills y desactiva «{skill['name']}». "
-                       "Si la subiste tú y ya no la quieres, bórrala desde su menú (…).", "command": None}
+        return {"how": t("guide.claude_ai", name=skill["name"]), "command": None}
+    if o["type"] == "platform":
+        return {"how": t("guide.platform"), "command": None}
     if o["type"] == "plugin" and o.get("via") == "app":
-        return {"how": f"En la app de Claude abre Customize > Plugins, busca «{plugin['name']}» y quítalo desde su menú (…). "
-                       "Se guarda en tu cuenta, así que deja de cargarse en todos tus dispositivos.", "command": None}
+        return {"how": t("guide.app_plugin", name=plugin["name"]), "command": None}
     if o["type"] == "plugin" and plugin.get("marketplace") == "skills-dir":
-        return {"how": "Es un plugin guardado como carpeta. Mueve esta carpeta a la papelera:",
+        return {"how": t("guide.skills_dir_plugin"),
                 "command": None, "path": home_path(plugin["root"], home)}
     if o["type"] == "plugin":
         scope = plugin.get("install_scope")
         flag = f" --scope {scope}" if scope in ("project", "local") else ""
-        return {"how": "Ejecuta este comando en una terminal, o escribe /plugin en Claude Code y quítalo desde la pestaña Installed.",
+        return {"how": t("guide.cc_plugin"),
                 "command": f"claude plugin uninstall {plugin['id']}{flag}"}
     if o["type"] == "npx-skills":
         where = "--global " if skill["scope"] == "personal" else ""
-        return {"how": "Se instaló con npx skills; quítala con el mismo programa:",
+        return {"how": t("guide.npx"),
                 "command": f"npx skills remove {where}{Path(plain(skill['path'])).parent.name}"}
     if o["type"] == "symlink":
-        return {"how": "Es un enlace a otra carpeta. Borra solo el enlace; la carpeta original queda donde está:",
+        return {"how": t("guide.symlink"),
                 "command": None, "path": folder}
-    return {"how": "Mueve esta carpeta a la papelera (así puedes recuperarla si la necesitas):", "command": None, "path": folder}
+    return {"how": t("guide.folder"), "command": None, "path": folder}
 
 
-_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f​-‏‪-‮⁠-⁤⁦-⁩]")
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069]")
 
 
 def clean_notes(notes, ids, limit=600):
@@ -132,6 +133,7 @@ def build_payload(inventory, scan, audit, manual, notes=None):
                         "rec": p["recommendation"], "reasons": [r["text"] for r in p["reasons"]],
                         "skills": p["skill_ids"], "fixed": p["fixed_tokens"], "guide": guide(first[pid], home)})
     return {
+        "lang": lang(),
         "generated_at": audit["generated_at"],
         "totals": audit["totals"],
         "competing": audit.get("competing", []),

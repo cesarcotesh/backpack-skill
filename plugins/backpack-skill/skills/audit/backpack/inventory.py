@@ -20,6 +20,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .i18n import t
+
 SCHEMA_VERSION = 1
 CHARS_PER_TOKEN = 3.7  # ponytail: char heuristic from SPEC; exact counts need the Anthropic API (network)
 LISTING_CAP = 1536  # description + when_to_use are cut here in the skill listing (Claude Code docs)
@@ -57,7 +59,7 @@ def _read_bytes(path, warnings):
     with open(path, "rb") as f:
         raw = f.read(MAX_READ + 1)
     if len(raw) > MAX_READ:
-        _warn(warnings, path, "file_truncated", "Archivo muy grande; solo se leyó el primer megabyte.")
+        _warn(warnings, path, "file_truncated", t("warn.file_truncated"))
         raw = raw[:MAX_READ]
     return raw
 
@@ -69,7 +71,7 @@ def _read_json(path, warnings):
     try:
         return json.loads(_read_bytes(path, warnings).decode("utf-8-sig"))
     except (OSError, ValueError):
-        _warn(warnings, path, "json_unreadable", "No se pudo leer este archivo JSON.")
+        _warn(warnings, path, "json_unreadable", t("warn.json_unreadable"))
         return None
 
 
@@ -181,10 +183,10 @@ def read_skill(skill_md, dir_name, scope, plugin, warnings, skill_enabled=None, 
     text = raw.decode("utf-8-sig", errors="replace")
     fm_lines, body, closed = split_frontmatter(text)
     if not closed:
-        _warn(warnings, skill_md, "frontmatter_unclosed", "El encabezado (frontmatter) no se cierra con '---'.")
+        _warn(warnings, skill_md, "frontmatter_unclosed", t("warn.frontmatter_unclosed"))
     fm, bad = parse_frontmatter(fm_lines or [])
     if bad:
-        _warn(warnings, skill_md, "frontmatter_unparsed", f"{len(bad)} línea(s) del encabezado no se entendieron.")
+        _warn(warnings, skill_md, "frontmatter_unparsed", t("warn.frontmatter_unparsed", count=len(bad)))
     malformed = not closed or bool(bad)
     if malformed:  # Claude Code loads a skill with malformed frontmatter with empty metadata
         fm = {}
@@ -305,7 +307,7 @@ def plugin_skills(root, plugin_id, marketplace, enabled_map, warnings, via=None)
     for rel in ["skills"] + declared:
         rel = os.path.normpath(rel)  # normalize here: Windows takes "." literally after the \\?\ prefix
         if os.path.isabs(rel) or rel == ".." or rel.startswith(".." + os.sep):
-            _warn(warnings, root, "plugin_path_outside", f"El plugin {name} apunta a una carpeta fuera de sí mismo; no se leyó.")
+            _warn(warnings, root, "plugin_path_outside", t("warn.plugin_path_outside", name=name))
             continue
         folder = root if rel == "." else root / rel
         if (folder / "SKILL.md").is_file():
@@ -341,7 +343,9 @@ def app_skills(app_data, enabled_map, warnings):
     return found
 
 
-def build_inventory(home, projects=(), app_data=None):
+def build_inventory(home, projects=(), app_data=None, platform_roots=()):
+    """platform_roots: folders of skills a platform loads by itself (claude.ai mounts them read-only);
+    they get origin "platform" and are turned off in that platform's settings."""
     home = fs_path(home)
     projects = [fs_path(p) for p in projects]
     app_data = fs_path(app_data) if app_data else None
@@ -361,7 +365,7 @@ def build_inventory(home, projects=(), app_data=None):
 
     for pid, root, install_scope in installed_plugin_roots(home / ".claude" / "plugins", warnings):
         if not root.is_dir():
-            _warn(warnings, root, "plugin_missing", f"El plugin {pid} está registrado pero su carpeta no existe.")
+            _warn(warnings, root, "plugin_missing", t("warn.plugin_missing", id=pid))
             continue
         mkt = pid.split("@", 1)[1] if "@" in pid else None
         for d, n, plug in plugin_skills(root, pid, mkt, enabled_map, warnings):
@@ -370,14 +374,18 @@ def build_inventory(home, projects=(), app_data=None):
 
     if app_data:
         found += [(d, n, "plugin", plug["id"], plug, on) for d, n, plug, on in app_skills(app_data, enabled_map, warnings)]
+    for root in (fs_path(r) for r in platform_roots):
+        found += [(d, d.name, "platform", root.name, None, None) for d in _skill_dirs(root)]
 
     skills, ids = [], set()
     for skill_dir, dir_name, scope, label, plugin, skill_enabled in found:
         try:
             skill = read_skill(skill_dir / "SKILL.md", dir_name, scope, plugin, warnings, skill_enabled, npx_root)
         except OSError:
-            _warn(warnings, skill_dir, "skill_unreadable", "No se pudo leer esta skill.")
+            _warn(warnings, skill_dir, "skill_unreadable", t("warn.skill_unreadable"))
             continue
+        if scope == "platform":
+            skill["origin"] = {"type": "platform"}
         base = f"{scope}:{label + '/' if label else ''}{dir_name}"
         sid, n = base, 2
         while sid in ids:

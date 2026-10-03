@@ -6,7 +6,8 @@ import webbrowser
 from pathlib import Path
 
 from .app import build_app, write_app
-from .audit import _n, build_audit, write_audit
+from .audit import build_audit, write_audit
+from .i18n import LANGS, n as _n, set_lang, t
 from .inventory import build_inventory, find_app_data, write_inventory
 from .manual import build_manual, shortlist, write_manual
 from .scanner import scan_inventory, write_scan
@@ -24,7 +25,7 @@ def load_notes(folder):
     try:
         return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
     except (OSError, ValueError):
-        print("No se pudo leer explanations.json; la interfaz sale sin explicaciones de Claude.")
+        print(t("cli.notes_unreadable"))
         return None
 
 
@@ -36,7 +37,8 @@ def run(args):
         projects = [here] if (here / ".claude").is_dir() and here.resolve() != Path(args.home).resolve() else []
     else:
         projects = args.project
-    inventory = build_inventory(args.home, projects, app_data)
+    set_lang(args.lang)
+    inventory = build_inventory(args.home, projects, app_data, args.skills_root or ())
     scan = scan_inventory(inventory)
     usage = build_usage(args.home, app_data)
     audit = build_audit(inventory, scan, usage)
@@ -47,14 +49,14 @@ def run(args):
     (out / "shortlist.json").write_text(json.dumps(shortlist(inventory, audit, manual), ensure_ascii=False, indent=2),
                                         encoding="utf-8")
     path = write_app(build_app(inventory, scan, audit, manual, load_notes(out)), out)
-    t = audit["totals"]
-    print(f"Revisé {t['skills']} skills{' (incluye la app de escritorio)' if app_data else ''}.")
-    print(f"Carga fija: ~{_n(t['fixed_tokens'])} tokens por conversación (estimado).")
-    print(f"Sugerencias: {t['lights']['orange']} para quitar, {t['lights']['mustard']} para revisar, "
-          f"{t['lights']['green']} para conservar. Quitando lo sugerido: ~{_n(t['fixed_tokens_after_removals'])} tokens.")
-    print(f"Riesgo alto en {scan['totals']['high']} skills y {scan['plugin_totals']['high']} plugins. {scan['disclaimer']}")
-    print(f"Interfaz: {path}")
-    print(f"Lista para explicar: {out / 'shortlist.json'}")
+    tot = audit["totals"]
+    print(t("cli.reviewed", count=tot["skills"], extra=t("cli.reviewed_app") if app_data else ""))
+    print(t("cli.load", tokens=_n(tot["fixed_tokens"])))
+    print(t("cli.suggestions", remove=tot["lights"]["orange"], review=tot["lights"]["mustard"],
+            keep=tot["lights"]["green"], after=_n(tot["fixed_tokens_after_removals"])))
+    print(t("cli.risk", skills=scan["totals"]["high"], plugins=scan["plugin_totals"]["high"], disclaimer=scan["disclaimer"]))
+    print(t("cli.page", path=path))
+    print(t("cli.shortlist", path=out / "shortlist.json"))
     if not args.no_open:
         webbrowser.open(path.resolve().as_uri())
     return 0
@@ -71,6 +73,8 @@ def main(argv=None):
     go.add_argument("--project", action="append", help="Carpeta de un proyecto. Por defecto, la carpeta actual si tiene .claude.")
     go.add_argument("--out", help="Carpeta de salida. Por defecto, la del plugin o ~/.backpack-skill.")
     go.add_argument("--no-open", action="store_true", help="No abrir la interfaz al terminar.")
+    go.add_argument("--lang", choices=LANGS, default="es", help="Idioma de los textos: es (español) o en (English).")
+    go.add_argument("--skills-root", action="append", help="Carpeta con skills que carga la plataforma (por ejemplo, en claude.ai). Se puede repetir.")
     inv = sub.add_parser("inventory", help="Genera inventory.json con las skills encontradas.")
     # --home is required on purpose: nothing reads the real ~/.claude unless asked explicitly
     inv.add_argument("--home", required=True, help="Carpeta que contiene .claude (por ejemplo, tu carpeta de usuario).")
@@ -109,9 +113,10 @@ def main(argv=None):
         for name in ("inventory", "scan", "audit", "manual"):
             with open(f"{args.data}/{name}.json", encoding="utf-8") as f:
                 loaded.append(json.load(f))
+        set_lang(loaded[2].get("lang", "es"))  # same language the review was written in
         notes = load_notes(args.data)
         path = write_app(build_app(*loaded, notes=notes), args.out)
-        print(f"Interfaz lista{' con explicaciones de Claude' if notes else ''}: ábrela con doble clic, sin conexión. Guardada en {path}")
+        print(t("cli.app_ready", notes=t("cli.app_notes") if notes else "", path=path))
         if args.open:
             webbrowser.open(path.resolve().as_uri())
         return 0
@@ -143,10 +148,10 @@ def main(argv=None):
         with open(args.inventory, encoding="utf-8") as f, open(args.scan, encoding="utf-8") as g:
             result = build_audit(json.load(f), json.load(g), usage)
         path = write_audit(result, args.out)
-        t = result["totals"]
-        print(f"Auditoría lista: {t['lights']['orange']} para quitar, {t['lights']['mustard']} para revisar, "
-              f"{t['lights']['green']} para conservar.")
-        print(f"Quitando lo sugerido, la carga fija baja de ~{t['fixed_tokens']} a ~{t['fixed_tokens_after_removals']} tokens (estimado).")
+        tot = result["totals"]
+        print(f"Auditoría lista: {tot['lights']['orange']} para quitar, {tot['lights']['mustard']} para revisar, "
+              f"{tot['lights']['green']} para conservar.")
+        print(f"Quitando lo sugerido, la carga fija baja de ~{tot['fixed_tokens']} a ~{tot['fixed_tokens_after_removals']} tokens (estimado).")
         print(f"Guardado en {path}")
         return 0
 
@@ -154,8 +159,8 @@ def main(argv=None):
         with open(args.inventory, encoding="utf-8") as f:
             result = scan_inventory(json.load(f))
         path = write_scan(result, args.out)
-        t = result["totals"]
-        print(f"Revisión lista: {t['high']} con riesgo alto, {t['medium']} medio, {t['low']} bajo, {t['none']} sin hallazgos.")
+        tot = result["totals"]
+        print(f"Revisión lista: {tot['high']} con riesgo alto, {tot['medium']} medio, {tot['low']} bajo, {tot['none']} sin hallazgos.")
         p = result["plugin_totals"]
         print(f"Plugins: {p['high']} con riesgo alto, {p['medium']} medio, {p['low']} bajo, {p['none']} sin hallazgos.")
         print(result["disclaimer"])
@@ -164,8 +169,8 @@ def main(argv=None):
 
     inventory = build_inventory(args.home, args.project, args.app_data)
     path = write_inventory(inventory, args.out)
-    t = inventory["totals"]
-    print(f"Inventario listo: {t['skills']} skills, ~{t['fixed_tokens']} tokens fijos por conversación (estimado).")
+    tot = inventory["totals"]
+    print(f"Inventario listo: {tot['skills']} skills, ~{tot['fixed_tokens']} tokens fijos por conversación (estimado).")
     if inventory["warnings"]:
         print(f"{len(inventory['warnings'])} aviso(s); revisa la sección 'warnings'.")
     print(f"Guardado en {path}")
