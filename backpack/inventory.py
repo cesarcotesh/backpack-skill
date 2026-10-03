@@ -124,7 +124,8 @@ def parse_frontmatter(lines):
             bad.append(line)
             continue
         block = []
-        while i < len(lines) and (not lines[i].strip() or lines[i][0] in " \t"):
+        # indented lines, or "- item" lines at column 0 (a valid YAML list under a key)
+        while i < len(lines) and (not lines[i].strip() or lines[i][0] in " \t-"):
             block.append(lines[i])
             i += 1
         data[m.group(1)] = _scalar(m.group(2).strip(), block)

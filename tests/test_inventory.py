@@ -83,6 +83,8 @@ class InventoryTest(unittest.TestCase):
         self.assertEqual(multi["description"], "Resume documentos largos en tres viñetas.")
         self.assertEqual(multi["allowed_tools"], ["Read", "Grep"])
         self.assertFalse(multi["flags"]["user_invocable"])
+        # its "- item" list at column 0 is valid YAML, not a malformed header
+        self.assertFalse([w for w in self.inv["warnings"] if Path(w["path"]).parent.name == "multi"])
         self.assertEqual(self.skill("personal:notes")["description"], "Toma notas rápidas de reuniones.")
         self.assertEqual(self.skill("plugin:dormant@acme/dormant")["name"], "dormant")
         broken = self.skill("personal:broken")  # malformed frontmatter loads with empty metadata

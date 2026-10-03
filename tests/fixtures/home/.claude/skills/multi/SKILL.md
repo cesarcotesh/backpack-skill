@@ -7,6 +7,9 @@ when_to_use: "Cuando pidan \"resume esto\" o \"dame lo importante\"."
 allowed-tools:
   - Read
   - Grep
+triggers:
+- "resumen"
+- "lo importante"
 user-invocable: false
 metadata:
   author: ejemplo
