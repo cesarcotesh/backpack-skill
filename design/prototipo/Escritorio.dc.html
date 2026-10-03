@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Mochila · Escritorio · Revisar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&amp;family=Atkinson+Hyperlegible:wght@400;700&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#16201A}a:hover{color:#2E6B4E}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #EEF1EC; color: #16201A; font-family: 'Atkinson Hyperlegible', 'Segoe UI', system-ui, sans-serif; display: flex; flex-wrap: wrap">
+<aside style="flex: 1 1 220px; box-sizing: border-box; background: #16201A; color: #FFFFFF; padding: 28px 18px; display: flex; flex-direction: column; gap: 28px">
+<span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 28px; letter-spacing: -0.5px; padding: 0 10px">mochila<span style="color: #F2581D">.</span></span>
+<nav aria-label="Secciones" style="display: flex; flex-direction: column; gap: 6px">
+<a href="Escritorio.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: 12px; background: #F2581D; color: #16201A; text-decoration: none; font-weight: 700; font-size: 15px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 10a6 6 0 0 1 12 0v9a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/><path d="M9.5 4.5V3h5v1.5"/><path d="M9 15h6"/></svg>Revisar</a>
+<a href="Manual.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: 12px; color: #FFFFFF; text-decoration: none; font-size: 15px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v14H8a3 3 0 0 1-3-3z"/><path d="M5 18a3 3 0 0 1 3-3h11"/></svg>Manual</a>
+<a href="Simulador.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: 12px; color: #FFFFFF; text-decoration: none; font-size: 15px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>Simulador</a>
+<button type="button" style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border: none; border-radius: 12px; background: transparent; color: #FFFFFF; font: 15px 'Atkinson Hyperlegible', sans-serif; text-align: left"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6"/><path d="M3 4v5h5"/><path d="M12 8v4l3 2"/></svg>Cambios</button>
+</nav>
+<div style="margin-top: auto; display: flex; flex-direction: column; gap: 14px; padding: 0 10px">
+<button type="button" aria-pressed="true" style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0; border: none; background: transparent; color: #FFFFFF; font: 700 14px 'Atkinson Hyperlegible', sans-serif"><span style="width: 34px; height: 20px; border-radius: 10px; background: #2E6B4E; display: flex; align-items: center; justify-content: flex-end; padding: 3px; box-sizing: border-box"><span style="width: 14px; height: 14px; border-radius: 7px; background: #FFFFFF"></span></span>Modo avanzado</button>
+<span style="font-size: 13px; line-height: 1.4; color: #C9D3CC">Cifras estimadas. Se cargan aunque nunca uses la skill.</span>
+</div>
+</aside>
+<main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 36px 40px 48px">
+<div style="max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px">
+<div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 14px; color: #4C5A51; font-weight: 700">Revisión · 367 skills instaladas</span>
+<h1 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 40px; line-height: 1.05; letter-spacing: -1px">Tu mochila pesa bastante.</h1>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 10px">
+<button type="button" style="height: 48px; padding: 0 20px; border: 1.5px solid #16201A; border-radius: 24px; background: transparent; color: #16201A; font: 700 15px 'Atkinson Hyperlegible', sans-serif">Escanear de nuevo</button>
+<a href="Revision.dc.html" style="display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 22px; border-radius: 24px; background: #16201A; color: #FFFFFF; text-decoration: none; font-weight: 700; font-size: 15px">Empezar la revisión<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></a>
+</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 16px">
+<section aria-label="Carga actual" style="flex: 2 1 340px; display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #FFFFFF; border-radius: 24px; padding: 22px 24px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 14px; color: #4C5A51">Carga fija por conversación</span>
+<span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 56px; line-height: 1; letter-spacing: -2px">53.500</span>
+<span style="font-size: 15px; font-weight: 700">tokens · estimado</span>
+</div>
+<svg width="84" height="98" viewBox="0 0 120 140" aria-hidden="true"><path d="M42 24V14a8 8 0 0 1 8-8h20a8 8 0 0 1 8 8v10" fill="none" stroke="#16201A" stroke-width="5" stroke-linecap="round"/><rect x="12" y="24" width="96" height="110" rx="32" fill="#F2581D" stroke="#16201A" stroke-width="5"/><path d="M14 60c28 14 64 14 92 0" fill="none" stroke="#16201A" stroke-width="4" stroke-linecap="round"/><rect x="34" y="82" width="52" height="34" rx="10" fill="#E9B425" stroke="#16201A" stroke-width="4"/></svg>
+</section>
+<div style="flex: 1 1 180px; display: flex; flex-direction: column; justify-content: center; gap: 4px; background: #FFFFFF; border-radius: 24px; padding: 22px 24px">
+<span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 36px; line-height: 1">367</span>
+<span style="font-size: 15px; font-weight: 700">skills instaladas</span>
+<span style="font-size: 14px; color: #4C5A51">En todas las carpetas</span>
+</div>
+<div style="flex: 1 1 180px; display: flex; flex-direction: column; justify-content: center; gap: 4px; background: #FFFFFF; border-radius: 24px; padding: 22px 24px">
+<span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 36px; line-height: 1">20</span>
+<span style="font-size: 15px; font-weight: 700">copias exactas</span>
+<span style="font-size: 14px; color: #4C5A51">~2.900 tokens</span>
+</div>
+<div style="flex: 1 1 180px; display: flex; flex-direction: column; justify-content: center; gap: 4px; background: #FFFFFF; border-radius: 24px; padding: 22px 24px">
+<span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 36px; line-height: 1">1</span>
+<span style="font-size: 15px; font-weight: 700">skill que se cuela</span>
+<span style="font-size: 14px; color: #4C5A51">Pide ir antes que todas</span>
+</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 24px">
+<section aria-label="Skills para revisar" style="flex: 999 1 560px; min-width: 0; background: #FFFFFF; border-radius: 24px; padding: 20px 20px 16px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px">
+<h2 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 600; font-size: 20px">Para revisar</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 6px">
+<button type="button" aria-pressed="true" style="height: 36px; padding: 0 14px; border: none; border-radius: 18px; background: #16201A; color: #FFFFFF; font: 700 13px 'Atkinson Hyperlegible', sans-serif">Todas</button>
+<button type="button" aria-pressed="false" style="height: 36px; padding: 0 14px; border: 1.5px solid #D5DDD6; border-radius: 18px; background: transparent; color: #16201A; font: 700 13px 'Atkinson Hyperlegible', sans-serif">Repetidas</button>
+<button type="button" aria-pressed="false" style="height: 36px; padding: 0 14px; border: 1.5px solid #D5DDD6; border-radius: 18px; background: transparent; color: #16201A; font: 700 13px 'Atkinson Hyperlegible', sans-serif">Compiten</button>
+<button type="button" aria-pressed="false" style="height: 36px; padding: 0 14px; border: 1.5px solid #D5DDD6; border-radius: 18px; background: transparent; color: #16201A; font: 700 13px 'Atkinson Hyperlegible', sans-serif">Pesadas</button>
+<button type="button" aria-pressed="false" style="height: 36px; padding: 0 14px; border: 1.5px solid #D5DDD6; border-radius: 18px; background: transparent; color: #16201A; font: 700 13px 'Atkinson Hyperlegible', sans-serif">Seguridad</button>
+</div>
+</div>
+<div style="overflow-x: auto">
+<table style="width: 100%; min-width: 680px; border-collapse: collapse; font-size: 14px">
+<thead>
+<tr style="text-align: left; color: #4C5A51; font-size: 13px">
+<th scope="col" style="padding: 10px 12px; font-weight: 700; border-bottom: 1px solid #D5DDD6">Skill</th>
+<th scope="col" style="padding: 10px 12px; font-weight: 700; border-bottom: 1px solid #D5DDD6">Motivo</th>
+<th scope="col" style="padding: 10px 12px; font-weight: 700; border-bottom: 1px solid #D5DDD6">Origen</th>
+<th scope="col" style="padding: 10px 12px; font-weight: 700; border-bottom: 1px solid #D5DDD6; text-align: right">Peso fijo</th>
+<th scope="col" style="padding: 10px 12px; font-weight: 700; border-bottom: 1px solid #D5DDD6; text-align: right">Al activarse</th>
+<th scope="col" style="padding: 10px 12px; font-weight: 700; border-bottom: 1px solid #D5DDD6">Sugerencia</th>
+</tr>
+</thead>
+<tbody>
+<tr style="background: #EEF1EC">
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6"><button type="button" aria-pressed="true" style="min-height: 44px; padding: 0; border: none; background: transparent; color: #16201A; font: 600 14px 'IBM Plex Mono', monospace; text-align: left">figma-use</button></td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6"><span style="padding: 4px 10px; border-radius: 12px; background: #E9B425; font-size: 12px; font-weight: 700">Repetida</span></td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6; color: #4C5A51">2 plugins</td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6; text-align: right">~190</td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6; text-align: right">~9.000</td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6; font-weight: 700">Quitar una copia</td>
+</tr>
+<tr>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6"><button type="button" aria-pressed="false" style="min-height: 44px; padding: 0; border: none; background: transparent; color: #16201A; font: 600 14px 'IBM Plex Mono', monospace; text-align: left">using-superpowers</button></td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6"><span style="padding: 4px 10px; border-radius: 12px; background: #F2581D; font-size: 12px; font-weight: 700">Se cuela</span></td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6; color: #4C5A51">Comunidad</td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6; text-align: right">~95</td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6; text-align: right">~860</td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6; font-weight: 700">Revisar</td>
+</tr>
+<tr>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6"><button type="button" aria-pressed="false" style="min-height: 44px; padding: 0; border: none; background: transparent; color: #16201A; font: 600 14px 'IBM Plex Mono', monospace; text-align: left">code-review-and-quality</button></td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6"><span style="padding: 4px 10px; border-radius: 12px; background: #DCE3DC; font-size: 12px; font-weight: 700">Compite</span></td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6; color: #4C5A51">Comunidad</td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6; text-align: right">~120</td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6; text-align: right">~3.800</td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6; font-weight: 700">Elegir una</td>
+</tr>
+<tr>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6"><button type="button" aria-pressed="false" style="min-height: 44px; padding: 0; border: none; background: transparent; color: #16201A; font: 600 14px 'IBM Plex Mono', monospace; text-align: left">code-review</button></td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6"><span style="padding: 4px 10px; border-radius: 12px; background: #DCE3DC; font-size: 12px; font-weight: 700">Compite</span></td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6; color: #4C5A51">Plugin · engineering</td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6; text-align: right">~100</td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6; text-align: right">~990</td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6; font-weight: 700">Elegir una</td>
+</tr>
+<tr>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6"><button type="button" aria-pressed="false" style="min-height: 44px; padding: 0; border: none; background: transparent; color: #16201A; font: 600 14px 'IBM Plex Mono', monospace; text-align: left">caveman-review</button></td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6"><span style="padding: 4px 10px; border-radius: 12px; background: #DCE3DC; font-size: 12px; font-weight: 700">Compite</span></td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6; color: #4C5A51">Comunidad</td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6; text-align: right">~70</td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6; text-align: right">~680</td>
+<td style="padding: 6px 12px; border-bottom: 1px solid #D5DDD6; font-weight: 700">Elegir una</td>
+</tr>
+<tr>
+<td style="padding: 6px 12px"><button type="button" aria-pressed="false" style="min-height: 44px; padding: 0; border: none; background: transparent; color: #16201A; font: 600 14px 'IBM Plex Mono', monospace; text-align: left">_council-engine</button></td>
+<td style="padding: 6px 12px"><span style="padding: 3px 10px; border-radius: 12px; border: 1.5px solid #16201A; font-size: 12px; font-weight: 700">Pesada</span></td>
+<td style="padding: 6px 12px; color: #4C5A51">Plugin</td>
+<td style="padding: 6px 12px; text-align: right">~50</td>
+<td style="padding: 6px 12px; text-align: right">~21.000</td>
+<td style="padding: 6px 12px; font-weight: 700">Revisar si la usas</td>
+</tr>
+</tbody>
+</table>
+</div>
+<span style="font-size: 13px; color: #4C5A51">Mostrando 6 de [N] skills para revisar · cifras en tokens, estimadas</span>
+</section>
+<aside aria-label="Ficha de la skill" style="flex: 1 1 320px; min-width: 0; background: #FFFFFF; border-radius: 24px; padding: 24px; display: flex; flex-direction: column; gap: 14px; box-sizing: border-box">
+<div style="display: flex; gap: 8px; flex-wrap: wrap">
+<span style="padding: 5px 12px; border-radius: 14px; background: #E9B425; font-size: 13px; font-weight: 700">Repetida</span>
+<span style="padding: 4px 12px; border-radius: 14px; border: 1.5px solid #16201A; font-size: 13px; font-weight: 700">Plugin</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<h2 style="margin: 0; font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 24px">figma-use</h2>
+<p style="margin: 0; font-size: 16px; line-height: 1.4">Ayuda a Claude a crear y editar diseños dentro de Figma.</p>
+</div>
+<p style="margin: 0; padding: 14px; border-radius: 16px; background: #FBF0CF; font-size: 15px; line-height: 1.4">Está dos veces, en dos plugins distintos. Claude lee ambas descripciones en cada conversación.</p>
+<dl style="margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<div><dt style="font-size: 13px; color: #4C5A51">Peso fijo</dt><dd style="margin: 2px 0 0; font-weight: 700; font-size: 16px">~190 tokens</dd></div>
+<div><dt style="font-size: 13px; color: #4C5A51">Al activarse</dt><dd style="margin: 2px 0 0; font-weight: 700; font-size: 16px">~9.000 tokens</dd></div>
+<div><dt style="font-size: 13px; color: #4C5A51">Último uso</dt><dd style="margin: 2px 0 0; font-weight: 700; font-size: 16px">[Fecha desde los logs]</dd></div>
+<div><dt style="font-size: 13px; color: #4C5A51">Origen</dt><dd style="margin: 2px 0 0; font-weight: 700; font-size: 16px">2 plugins</dd></div>
+</dl>
+<p style="margin: 0; font-size: 15px; line-height: 1.4"><strong>Sugerencia:</strong> quita una copia. Si no usas Figma, quita las dos.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 10px">
+<button type="button" style="flex: 1 1 120px; display: flex; align-items: center; justify-content: center; gap: 8px; height: 48px; border: none; border-radius: 24px; background: #F2581D; color: #16201A; font: 700 15px 'Atkinson Hyperlegible', sans-serif"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>Quitar</button>
+<button type="button" style="flex: 1 1 120px; display: flex; align-items: center; justify-content: center; gap: 8px; height: 48px; border: none; border-radius: 24px; background: #2E6B4E; color: #FFFFFF; font: 700 15px 'Atkinson Hyperlegible', sans-serif"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Conservar</button>
+</div>
+<a href="Manual.dc.html" style="font-size: 14px; font-weight: 700">Ver ficha completa en el manual</a>
+</aside>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

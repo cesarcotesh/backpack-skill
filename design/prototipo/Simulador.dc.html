@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Mochila · Simulador de activación</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&amp;family=Atkinson+Hyperlegible:wght@400;700&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#16201A}a:hover{color:#2E6B4E}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #EEF1EC; color: #16201A; font-family: 'Atkinson Hyperlegible', 'Segoe UI', system-ui, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+<div style="flex: 1; min-height: 0; padding: 20px 20px 0; display: flex; flex-direction: column; gap: 12px">
+<h1 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 30px; line-height: 1.1; letter-spacing: -0.6px">¿Quién responde?</h1>
+<p style="margin: 0; font-size: 15px; line-height: 1.4; color: #4C5A51">Escribe algo que le pedirías a Claude y mira qué skill se activaría.</p>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="pedido" style="font-size: 14px; font-weight: 700">Tu pedido</label>
+<div style="display: flex; gap: 8px">
+<input id="pedido" type="text" value="Revisa mi código antes de subirlo" style="flex: 1; min-width: 0; height: 52px; box-sizing: border-box; padding: 0 16px; border: 1.5px solid #16201A; border-radius: 16px; background: #FFFFFF; color: #16201A; font: 16px 'Atkinson Hyperlegible', sans-serif">
+<button type="button" style="flex: none; height: 52px; padding: 0 18px; border: none; border-radius: 16px; background: #16201A; color: #FFFFFF; font: 700 15px 'Atkinson Hyperlegible', sans-serif">Probar</button>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px">
+<span style="font-size: 12px; color: #4C5A51; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase">Ejemplo de predicción</span>
+<h2 style="margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 24px; line-height: 1.2"><span style="background: #F2581D; padding: 0 6px; border-radius: 6px">5 skills</span> compiten por este pedido</h2>
+</div>
+<ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px">
+<li style="display: flex; align-items: center; gap: 10px; min-height: 52px; box-sizing: border-box; padding: 8px 14px; background: #FFFFFF; border-radius: 16px">
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 14px">code-review-and-quality</span><span style="font-size: 13px; color: #4C5A51">Comunidad</span></span>
+<span style="flex: none; padding: 4px 10px; border-radius: 12px; background: #16201A; color: #FFFFFF; font-size: 13px; font-weight: 700">Alta</span>
+</li>
+<li style="display: flex; align-items: center; gap: 10px; min-height: 52px; box-sizing: border-box; padding: 8px 14px; background: #FFFFFF; border-radius: 16px">
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 14px">code-review</span><span style="font-size: 13px; color: #4C5A51">Plugin · engineering</span></span>
+<span style="flex: none; padding: 4px 10px; border-radius: 12px; background: #16201A; color: #FFFFFF; font-size: 13px; font-weight: 700">Alta</span>
+</li>
+<li style="display: flex; align-items: center; gap: 10px; min-height: 52px; box-sizing: border-box; padding: 8px 14px; background: #FFFFFF; border-radius: 16px">
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 14px">review</span><span style="font-size: 13px; color: #4C5A51">Comunidad</span></span>
+<span style="flex: none; padding: 4px 10px; border-radius: 12px; background: #DCE3DC; color: #16201A; font-size: 13px; font-weight: 700">Media</span>
+</li>
+<li style="display: flex; align-items: center; gap: 10px; min-height: 52px; box-sizing: border-box; padding: 8px 14px; background: #FFFFFF; border-radius: 16px">
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 14px">requesting-code-review</span><span style="font-size: 13px; color: #4C5A51">Comunidad</span></span>
+<span style="flex: none; padding: 4px 10px; border-radius: 12px; background: #DCE3DC; color: #16201A; font-size: 13px; font-weight: 700">Media</span>
+</li>
+<li style="display: flex; align-items: center; gap: 10px; min-height: 52px; box-sizing: border-box; padding: 8px 14px; background: #FFFFFF; border-radius: 16px">
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 14px">caveman-review</span><span style="font-size: 13px; color: #4C5A51">Comunidad</span></span>
+<span style="flex: none; padding: 4px 10px; border-radius: 12px; background: #DCE3DC; color: #16201A; font-size: 13px; font-weight: 700">Media</span>
+</li>
+</ol>
+<div style="display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 20px; background: #2E6B4E; color: #FFFFFF">
+<p style="margin: 0; font-size: 15px; line-height: 1.4">Quédate con una para revisar código. Mientras haya cinco, van a competir cada vez que lo pidas.</p>
+<a href="Revision.dc.html" style="display: flex; align-items: center; justify-content: center; height: 44px; border-radius: 22px; background: #FFFFFF; color: #16201A; text-decoration: none; font-weight: 700; font-size: 15px">Elegir cuál conservar</a>
+</div>
+</div>
+<nav aria-label="Secciones" style="flex: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: #FFFFFF; border-top: 1px solid #D5DDD6; padding: 8px 8px 14px">
+<a href="Main.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 52px; text-decoration: none; color: #4C5A51; font-size: 12px"><span style="display: flex; align-items: center; justify-content: center; width: 56px; height: 30px; border-radius: 15px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 10a6 6 0 0 1 12 0v9a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/><path d="M9.5 4.5V3h5v1.5"/><path d="M9 15h6"/></svg></span>Revisar</a>
+<a href="Manual.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 52px; text-decoration: none; color: #4C5A51; font-size: 12px"><span style="display: flex; align-items: center; justify-content: center; width: 56px; height: 30px; border-radius: 15px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v14H8a3 3 0 0 1-3-3z"/><path d="M5 18a3 3 0 0 1 3-3h11"/></svg></span>Manual</a>
+<a href="Simulador.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 52px; text-decoration: none; color: #16201A; font-size: 12px; font-weight: 700"><span style="display: flex; align-items: center; justify-content: center; width: 56px; height: 30px; border-radius: 15px; background: #F2581D"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg></span>Simulador</a>
+<button type="button" style="display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 52px; padding: 0; border: none; background: transparent; color: #4C5A51; font: 12px 'Atkinson Hyperlegible', sans-serif"><span style="display: flex; align-items: center; justify-content: center; width: 56px; height: 30px; border-radius: 15px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6"/><path d="M3 4v5h5"/><path d="M12 8v4l3 2"/></svg></span>Cambios</button>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
