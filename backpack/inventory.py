@@ -276,11 +276,27 @@ def plugin_skills(root, plugin_id, marketplace, enabled_map, warnings, via=None)
     plugin = {"id": plugin_id, "name": name, "marketplace": marketplace, "enabled": enabled, "root": plain(root)}
     if via:
         plugin["via"] = via
-    if (root / "skills").is_dir():
-        return [(d, d.name, plugin) for d in _skill_dirs(root / "skills")]
-    if (root / "SKILL.md").is_file():  # single-skill plugin
-        return [(root, name, plugin)]
-    return []
+    declared = manifest.get("skills")
+    declared = [declared] if isinstance(declared, str) else [p for p in declared or [] if isinstance(p, str)]
+    if not declared and not (root / "skills").is_dir():
+        return [(root, name, plugin)] if (root / "SKILL.md").is_file() else []  # single-skill plugin
+    # the manifest's "skills" paths are added to skills/ (docs don't say they replace it)
+    found, seen = [], set()
+    for rel in ["skills"] + declared:
+        rel = os.path.normpath(rel)  # normalize here: Windows takes "." literally after the \\?\ prefix
+        if os.path.isabs(rel) or rel == ".." or rel.startswith(".." + os.sep):
+            _warn(warnings, root, "plugin_path_outside", f"El plugin {name} apunta a una carpeta fuera de sí mismo; no se leyó.")
+            continue
+        folder = root if rel == "." else root / rel
+        if (folder / "SKILL.md").is_file():
+            entries = [(folder, name if folder == root else folder.name)]
+        else:
+            entries = [(d, d.name) for d in _skill_dirs(folder)]
+        for d, n in entries:
+            if d not in seen:
+                seen.add(d)
+                found.append((d, n, plugin))
+    return found
 
 
 def app_skills(app_data, enabled_map, warnings):

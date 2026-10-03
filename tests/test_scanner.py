@@ -103,7 +103,7 @@ class ScannerTest(unittest.TestCase):
         self.assertEqual(scan["skills"]["personal:trap"]["risk"], "high")
         self.assertEqual(scan["skills"]["personal:pdf-helper"]["risk"], "none")
         self.assertEqual(sum(scan["totals"].values()), len(scan["skills"]))
-        self.assertEqual(set(scan["plugins"]), {"toolkit@acme", "dormant@acme", "bundle@skills-dir"})
+        self.assertEqual(set(scan["plugins"]), {"toolkit@acme", "dormant@acme", "bundle@skills-dir", "custom-paths@skills-dir"})
         self.assertEqual(scan["plugins"]["toolkit@acme"]["risk"], "none")
         self.assertEqual({r["id"] for r in scan["rules"]}, set(RULES))
         self.assertIn("no garantiza", scan["disclaimer"])

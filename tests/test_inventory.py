@@ -54,11 +54,11 @@ class InventoryTest(unittest.TestCase):
         self.assertEqual(sorted(self.by_id), [
             "personal:broken", "personal:cloned-skill", "personal:deploy", "personal:multi",
             "personal:notes", "personal:pdf-helper", "personal:review", "personal:trap", "personal:verbose",
-            "plugin:bundle@skills-dir/bundle-a", "plugin:dormant@acme/dormant",
+            "plugin:bundle@skills-dir/bundle-a", "plugin:custom-paths@skills-dir/cp-a", "plugin:dormant@acme/dormant",
             "plugin:toolkit@acme/changelog", "plugin:toolkit@acme/review",
             "project:project/pdf-helper",
         ])
-        self.assertEqual(self.inv["totals"]["skills"], 14)
+        self.assertEqual(self.inv["totals"]["skills"], 15)
 
     def test_copy_groups(self):
         groups = {g["name"]: g for g in self.inv["copy_groups"]}
@@ -165,6 +165,7 @@ class InventoryTest(unittest.TestCase):
         self.assertEqual(codes, {
             (".claude/skills/broken/SKILL.md", "frontmatter_unclosed"),
             (".claude/plugins/cache/acme/ghost/9.9.9", "plugin_missing"),
+            (".claude/skills/custom-paths", "plugin_path_outside"),  # "../../outside" is not read
         })
 
     def test_skill_content_is_data(self):
