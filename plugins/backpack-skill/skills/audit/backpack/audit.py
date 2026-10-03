@@ -197,7 +197,9 @@ def build_audit(inventory, scan, usage=None, today=None):
         rec = "review" if plugin_reasons else "keep"
         weight = sum(s["tokens"]["fixed"] for s in plugin_skills)
         # a plugin is uninstalled as a whole: suggest it only when none of its skills was used
-        if since and weight > 0 and all(use.get(s["id"], {}).get("count") == 0 for s in plugin_skills):
+        reviewer = any(scan.get("skills", {}).get(s["id"], {}).get("self") for s in plugin_skills)
+        if (not reviewer and since and weight > 0
+                and all(use.get(s["id"], {}).get("count") == 0 for s in plugin_skills)):
             plugin_reasons.insert(0, _reason("unused",
                 t("reason.plugin_unused", count=len(plugin_skills), since=since, tokens=_n(weight))))
             rec = "remove"

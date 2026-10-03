@@ -66,6 +66,17 @@ class SelfRecognitionTest(unittest.TestCase):
         self.assertEqual(audit["skills"]["real"]["reasons"][0]["code"], "self")
         self.assertEqual(audit["skills"]["copy"]["recommendation"], "review")
 
+    def test_reviewer_plugin_is_not_suggested_for_removal(self):
+        plugin = {"id": "backpack-skill@m", "name": "backpack-skill", "marketplace": "m", "enabled": True, "root": str(PLUGIN)}
+        skill = {"id": "real", "name": "audit", "command": "/backpack-skill:audit", "scope": "plugin",
+                 "path": str(SKILL / "SKILL.md"), "description": "x", "plugin": plugin,
+                 "flags": {"model_invocable": True, "user_invocable": True, "loaded": True},
+                 "tokens": {"fixed": 71, "body": 900, "estimated": True}}
+        inventory = {"skills": [skill], "copy_groups": []}
+        usage = {"history_since": "2026-05-27", "skills": {}}  # freshly installed: never used yet
+        audit = build_audit(inventory, scan_inventory(inventory), usage, today=date(2026, 10, 3))
+        self.assertEqual(audit["plugins"]["backpack-skill@m"]["recommendation"], "keep")
+
 
 class RunTest(unittest.TestCase):
     def setUp(self):
