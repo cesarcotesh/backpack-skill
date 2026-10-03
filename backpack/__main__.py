@@ -5,6 +5,7 @@ import sys
 from .audit import build_audit, write_audit
 from .inventory import build_inventory, write_inventory
 from .scanner import scan_inventory, write_scan
+from .usage import build_usage, write_usage
 
 
 def main(argv=None):
@@ -23,12 +24,29 @@ def main(argv=None):
     aud = sub.add_parser("audit", help="Da un semáforo y una recomendación por skill y genera audit.json.")
     aud.add_argument("--inventory", default="out/inventory.json", help="Ruta de inventory.json.")
     aud.add_argument("--scan", default="out/scan.json", help="Ruta de scan.json.")
+    aud.add_argument("--usage", help="Ruta de usage.json (opcional).")
     aud.add_argument("--out", default="out", help="Carpeta donde se guarda audit.json.")
+    use = sub.add_parser("usage", help="Cuenta qué skills usaste y cuándo, leyendo solo nombres y fechas de los logs.")
+    use.add_argument("--home", required=True, help="Carpeta que contiene .claude.")
+    use.add_argument("--app-data", help="Carpeta de datos de la app de escritorio de Claude, para incluir sus sesiones.")
+    use.add_argument("--out", default="out", help="Carpeta donde se guarda usage.json.")
     args = parser.parse_args(argv)
 
+    if args.command == "usage":
+        result = build_usage(args.home, args.app_data)
+        path = write_usage(result, args.out)
+        print(f"Uso listo: {len(result['skills'])} skills usadas en {result['sources']['files']} sesiones"
+              f" (historial desde {result['history_since'] or 'sin datos'}).")
+        print(f"Guardado en {path}")
+        return 0
+
     if args.command == "audit":
+        usage = None
+        if args.usage:
+            with open(args.usage, encoding="utf-8") as h:
+                usage = json.load(h)
         with open(args.inventory, encoding="utf-8") as f, open(args.scan, encoding="utf-8") as g:
-            result = build_audit(json.load(f), json.load(g))
+            result = build_audit(json.load(f), json.load(g), usage)
         path = write_audit(result, args.out)
         t = result["totals"]
         print(f"Auditoría lista: {t['lights']['orange']} para quitar, {t['lights']['mustard']} para revisar, "

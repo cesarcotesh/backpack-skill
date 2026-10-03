@@ -1,0 +1,1 @@
+{"type":"assistant","timestamp":"2026-07-10T08:00:00.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t9","name":"Skill","input":{"skill":"travel:plan-trip","args":"TEXTO-PRIVADO-1234"}}]}}

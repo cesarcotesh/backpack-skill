@@ -8,10 +8,13 @@ from datetime import datetime, timezone
 from itertools import combinations
 from pathlib import Path
 
+from .usage import days_since
+
 SCHEMA_VERSION = 1
 OVERLAP_MIN = 0.5  # share of description words two skills have in common to "compete"
 HEAVY_FIXED = 150  # estimated tokens loaded in every conversation
 HEAVY_BODY = 5000  # estimated tokens loaded when the skill activates
+UNUSED_DAYS = 30  # last use this long ago is worth mentioning
 SCOPE_PRIORITY = {"personal": 0, "project": 1, "plugin": 2}  # which exact copy to keep (personal beats project)
 RECOMMENDATION_ORDER = ["remove", "review", "merge", "tune", "keep"]
 
@@ -49,8 +52,35 @@ def _risk_titles(result, rules):
     return sorted({rules[f["rule"]]["title"] for f in result["findings"] if f["severity"] in ("high", "medium")})
 
 
-def build_audit(inventory, scan):
+def skill_usage(skills, usage, today=None):
+    """{skill id: {count, last_used, days_unused}} from usage.json, or {} without it.
+    Logs name a skill by its command ("toolkit:review", "pdf-helper"); a typed short name
+    counts for a plugin skill only when nothing else answers to that name."""
+    if not usage:
+        return {}
+    used = usage.get("skills", {})
+    plain_names = {s["name"] for s in skills if not s.get("plugin")}
+    short = {}
+    for s in skills:
+        if s.get("plugin") and s["name"] not in plain_names:
+            short.setdefault(s["name"], []).append(s["id"])
+    out = {}
+    for s in skills:
+        recs = [used.get(s["command"].lstrip("/"))]
+        if short.get(s["name"]) == [s["id"]]:
+            recs.append(used.get(s["name"]))
+        recs = [r for r in recs if r]
+        count = sum(r["count"] for r in recs)
+        last = max((r["last_used"] for r in recs), default=None)
+        out[s["id"]] = {"count": count, "last_used": last,
+                        "days_unused": days_since(last, today) if last else None}
+    return out
+
+
+def build_audit(inventory, scan, usage=None, today=None):
     skills = inventory["skills"]
+    use = skill_usage(skills, usage, today)
+    since = (usage or {}).get("history_since")
     by_id = {s["id"]: s for s in skills}
     rules = {r["id"]: r for r in scan.get("rules", [])}
     reasons = {s["id"]: [] for s in skills}
@@ -112,6 +142,12 @@ def build_audit(inventory, scan):
             recs[sid].add("tune")
         if not s["flags"]["loaded"]:
             reasons[sid].append(_reason("disabled", "Está desactivada, así que hoy no pesa."))
+        u = use.get(sid)
+        if u and u["count"] == 0 and since:
+            reasons[sid].append(_reason("unused",
+                f"No hay registro de uso desde el {since} (hace {days_since(since, today)} días)."))
+        elif u and u["days_unused"] is not None and u["days_unused"] >= UNUSED_DAYS:
+            reasons[sid].append(_reason("unused", f"No la usas hace {u['days_unused']} días."))
 
         # security of the skill's own folder; the rest of a plugin is judged once, under "plugins"
         result = scan.get("skills", {}).get(sid)
@@ -131,7 +167,7 @@ def build_audit(inventory, scan):
         light = "orange" if rec == "remove" else "mustard" if rec != "keep" else "green"
         light_totals[light] += 1
         results[sid] = {"light": light, "recommendation": rec, "reasons": reasons[sid],
-                        "tokens": s["tokens"]}
+                        "tokens": s["tokens"], "usage": use.get(sid)}
 
     # plugins are what gets uninstalled, so their own files (hooks, servers, commands) are judged here once
     plugins, plugin_lights = {}, {"mustard": 0, "green": 0}
@@ -175,6 +211,9 @@ def build_audit(inventory, scan):
             "fixed_tokens_after_removals": fixed - savings,
             "savings": savings,
             "estimated": True,
+            "usage_history_since": since,
+            "unused_skills": sum(1 for u in use.values() if u["count"] == 0),
+            "unused_fixed_tokens": sum(s["tokens"]["fixed"] for s in skills if use.get(s["id"], {}).get("count") == 0),
         },
         "competing": competing,
         "skills": results,
