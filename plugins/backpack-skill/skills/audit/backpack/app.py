@@ -126,12 +126,19 @@ def build_payload(inventory, scan, audit, manual, notes=None):
     for s in inventory["skills"]:
         if s.get("plugin") and s["origin"]["type"] != "claude.ai":
             first.setdefault(s["plugin"]["id"], s)
+    for pid, extra in inventory.get("plugin_extras", {}).items():  # plugins with agents/commands but no skills
+        plug = extra["plugin"]
+        if pid not in first and plug.get("via") != "claude.ai":
+            origin = {"type": "plugin", "marketplace": plug["marketplace"], **({"via": plug["via"]} if plug.get("via") else {})}
+            first[pid] = {"name": plug["name"], "scope": "plugin", "origin": origin, "plugin": plug,
+                          "path": str(Path(plain(plug["root"])) / "plugin")}
     for pid, p in audit.get("plugins", {}).items():
         if pid not in first:
             continue
         plugins.append({"id": pid, "name": p["name"], "origin": origin_label(first[pid]), "light": p["light"],
                         "rec": p["recommendation"], "reasons": [r["text"] for r in p["reasons"]],
-                        "skills": p["skill_ids"], "fixed": p["fixed_tokens"], "guide": guide(first[pid], home)})
+                        "skills": p["skill_ids"], "fixed": p["fixed_tokens"], "guide": guide(first[pid], home),
+                        "extras": p.get("extras", {"agents": 0, "commands": 0, "fixed": 0})})
     return {
         "lang": lang(),
         "generated_at": audit["generated_at"],

@@ -2,7 +2,8 @@
 
 Privacy rule: only skill names and dates leave this module. Lines that can't hold
 an invocation are skipped unparsed; from the rest, only the Skill tool's "skill"
-field, the <command-name> tag and the timestamp are read. Arguments, messages and
+field, a plugin agent's name ("subagent_type"), the <command-name> tag and the
+timestamp are read. Arguments, messages and
 tool results are never kept.
 
 Logs (Claude Code docs, claude-directory): ~/.claude/projects/<project>/<session>.jsonl,
@@ -33,7 +34,7 @@ def log_dirs(home, app_data=None):
 
 def invocations(line):
     """(skill name, ISO timestamp) pairs found in one log line. Nothing else is returned."""
-    if '"Skill"' not in line and "<command-name>" not in line:
+    if '"Skill"' not in line and "<command-name>" not in line and '"subagent_type"' not in line:
         return []
     try:
         entry = json.loads(line)
@@ -55,6 +56,10 @@ def invocations(line):
                 skill = (block.get("input") or {}).get("skill")
                 if isinstance(skill, str) and skill.strip():
                     found.append(skill.strip().lstrip("/"))
+            elif block.get("type") == "tool_use" and block.get("name") in ("Agent", "Task"):
+                agent = (block.get("input") or {}).get("subagent_type")  # a plugin agent counts as using its plugin
+                if isinstance(agent, str) and ":" in agent:
+                    found.append(agent.strip())
             elif block.get("type") == "text" and message.get("role") == "user":
                 found += _COMMAND.findall(block.get("text") or "")
     return [(name, stamp) for name in found if isinstance(stamp, str)]

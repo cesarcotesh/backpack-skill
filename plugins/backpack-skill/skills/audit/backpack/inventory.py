@@ -195,7 +195,9 @@ def read_skill(skill_md, dir_name, scope, plugin, warnings, skill_enabled=None, 
     if malformed:  # Claude Code loads a skill with malformed frontmatter with empty metadata
         fm = {}
 
-    name = _as_text(fm.get("name")).strip() or dir_name
+    # Plugin skills answer to their folder name: that's how Claude Code lists and counts them on a real
+    # install (session skill listing and `claude plugin details`), even when the header says otherwise.
+    name = dir_name if plugin else (_as_text(fm.get("name")).strip() or dir_name)
     description = _as_text(fm.get("description")).strip()
     if not description and not malformed:  # Claude Code falls back to the first non-empty markdown line
         description = next((l.strip() for l in body.splitlines() if l.strip() and l.strip() != "---"), "")
@@ -292,7 +294,7 @@ def find_app_data(home=None):
 
 
 def plugin_skills(root, plugin_id, marketplace, enabled_map, warnings, via=None):
-    """Skills of one plugin root as (skill_dir, dir_name, plugin) tuples."""
+    """(plugin, [(skill_dir, dir_name, plugin), ...]) for one plugin root; the list may be empty."""
     manifest = _read_json(root / ".claude-plugin" / "plugin.json", warnings) or {}
     name = manifest.get("name") or (plugin_id or root.name).split("@")[0]
     plugin_id = plugin_id or f"{name}@{marketplace}"
@@ -305,7 +307,7 @@ def plugin_skills(root, plugin_id, marketplace, enabled_map, warnings, via=None)
     declared = manifest.get("skills")
     declared = [declared] if isinstance(declared, str) else [p for p in declared or [] if isinstance(p, str)]
     if not declared and not (root / "skills").is_dir():
-        return [(root, name, plugin)] if (root / "SKILL.md").is_file() else []  # single-skill plugin
+        return plugin, [(root, name, plugin)] if (root / "SKILL.md").is_file() else []  # single-skill plugin
     # the manifest's "skills" paths are added to skills/ (docs don't say they replace it)
     found, seen = [], set()
     for rel in ["skills"] + declared:
@@ -322,29 +324,64 @@ def plugin_skills(root, plugin_id, marketplace, enabled_map, warnings, via=None)
             if d not in seen:
                 seen.add(d)
                 found.append((d, n, plugin))
-    return found
+    return plugin, found
+
+
+def _declared_paths(manifest, key):
+    value = manifest.get(key)
+    return [value] if isinstance(value, str) else [v for v in value or [] if isinstance(v, str)]  # ponytail: object maps skipped
+
+
+def plugin_extras(plugin, warnings):
+    """A plugin's agents and commands. Their descriptions are listed in every session like skills'
+    (Claude Code's `claude plugin details` counts them as always-on), so they weigh too."""
+    root = fs_path(plugin["root"])
+    manifest = _read_json(root / ".claude-plugin" / "plugin.json", warnings) or {}
+    items = []
+    for kind in ("agents", "commands"):
+        files = set()
+        for rel in [kind] + _declared_paths(manifest, kind):
+            rel = os.path.normpath(rel)
+            if os.path.isabs(rel) or rel == ".." or rel.startswith(".." + os.sep):
+                continue  # never read outside the plugin
+            target = root if rel == "." else root / rel
+            if target.is_file() and target.suffix == ".md":
+                files.add(target)
+            elif target.is_dir():
+                files.update(f for f in target.rglob("*.md") if f.name.lower() != "readme.md")
+        for f in sorted(files):
+            fm_lines, body, _ = split_frontmatter(_read_bytes(f, warnings).decode("utf-8-sig", errors="replace"))
+            fm, _ = parse_frontmatter(fm_lines or [])
+            name = (_as_text(fm.get("name")).strip() if kind == "agents" else "") or f.stem
+            desc = _as_text(fm.get("description")).strip() or next((l.strip() for l in body.splitlines() if l.strip()), "")
+            listed = plugin["enabled"] is not False and not _is_true(fm.get("disable-model-invocation"))
+            items.append({"kind": kind[:-1], "name": name, "path": plain(f),
+                          "fixed": estimate_tokens(f"{name}: {desc[:LISTING_CAP]}") if listed else 0})
+    return items
 
 
 def app_skills(app_data, enabled_map, warnings):
-    """Skills the Claude desktop app loads by itself, as (skill_dir, dir_name, plugin, skill_enabled).
+    """Plugins and skills the Claude desktop app loads by itself: (plugins, [(skill_dir, dir_name, plugin, skill_enabled)]).
     - its plugins: local-agent-mode-sessions/<org>/<user>/rpm/<plugin id>/, described in rpm/manifest.json
     - skills synced from claude.ai: local-agent-mode-sessions/skills-plugin/<org>/<user>/, with a
       per-skill "enabled" flag in its manifest.json
     """
-    found = []
+    found, plugins = [], []
     sessions = app_data / "local-agent-mode-sessions"
     for rpm in sorted(sessions.glob("*/*/rpm")):
         listed = (_read_json(rpm / "manifest.json", warnings) or {}).get("plugins") or []
         meta = {p.get("id"): p for p in listed if isinstance(p, dict)}
         for root in sorted(d for d in rpm.iterdir() if d.is_dir()):
             mkt = meta.get(root.name, {}).get("marketplaceName") or "app"
-            found += [(d, n, plug, None) for d, n, plug in plugin_skills(root, None, mkt, enabled_map, warnings, via="app")]
+            plug, skills = plugin_skills(root, None, mkt, enabled_map, warnings, via="app")
+            plugins.append(plug)
+            found += [(d, n, plug, None) for d, n, plug in skills]
     for root in sorted(sessions.glob("skills-plugin/*/*")):
         listed = (_read_json(root / "manifest.json", warnings) or {}).get("skills") or []
         enabled = {s.get("name"): s.get("enabled") for s in listed if isinstance(s, dict)}
         found += [(d, n, plug, enabled.get(n) if isinstance(enabled.get(n), bool) else None)
-                  for d, n, plug in plugin_skills(root, None, "claude.ai", enabled_map, warnings, via="claude.ai")]
-    return found
+                  for d, n, plug in plugin_skills(root, None, "claude.ai", enabled_map, warnings, via="claude.ai")[1]]
+    return plugins, found
 
 
 def build_inventory(home, projects=(), app_data=None, platform_roots=()):
@@ -358,26 +395,31 @@ def build_inventory(home, projects=(), app_data=None, platform_roots=()):
     enabled_map = enabled_plugins(home, projects, warnings)
 
     found = []  # (skill_dir, dir_name, scope, label, plugin, skill_enabled)
+    plugins = []  # every plugin seen, with or without skills
     roots = [(home / ".claude" / "skills", "personal", "")]
     roots += [(p / ".claude" / "skills", "project", p.name) for p in projects]
     for skills_dir, scope, label in roots:
         plugin_dirs = _plugin_dirs(skills_dir)
         found += [(d, d.name, scope, label, None, None) for d in _skill_dirs(skills_dir) if d not in plugin_dirs]
         for pdir in plugin_dirs:
-            found += [(d, n, "plugin", plug["id"], plug, None)
-                      for d, n, plug in plugin_skills(pdir, None, "skills-dir", enabled_map, warnings)]
+            plug, skills = plugin_skills(pdir, None, "skills-dir", enabled_map, warnings)
+            plugins.append(plug)
+            found += [(d, n, "plugin", plug["id"], plug, None) for d, n, plug in skills]
 
     for pid, root, install_scope in installed_plugin_roots(home / ".claude" / "plugins", warnings):
         if not root.is_dir():
             _warn(warnings, root, "plugin_missing", t("warn.plugin_missing", id=pid))
             continue
         mkt = pid.split("@", 1)[1] if "@" in pid else None
-        for d, n, plug in plugin_skills(root, pid, mkt, enabled_map, warnings):
-            plug["install_scope"] = install_scope  # user, project or local: uninstalling needs it
-            found.append((d, n, "plugin", pid, plug, None))
+        plug, skills = plugin_skills(root, pid, mkt, enabled_map, warnings)
+        plug["install_scope"] = install_scope  # user, project or local: uninstalling needs it
+        plugins.append(plug)
+        found += [(d, n, "plugin", pid, plug, None) for d, n, plug in skills]
 
     if app_data:
-        found += [(d, n, "plugin", plug["id"], plug, on) for d, n, plug, on in app_skills(app_data, enabled_map, warnings)]
+        app_plugins, app_found = app_skills(app_data, enabled_map, warnings)
+        plugins += app_plugins
+        found += [(d, n, "plugin", plug["id"], plug, on) for d, n, plug, on in app_found]
     for root in (fs_path(r) for r in platform_roots):
         found += [(d, d.name, "platform", root.name, None, None) for d in _skill_dirs(root)]
 
@@ -411,6 +453,14 @@ def build_inventory(home, projects=(), app_data=None, platform_roots=()):
     for s in skills:
         s.setdefault("copy_group", None)
 
+    extras = {}  # plugin id -> its agents and commands
+    for plug in plugins:
+        items = plugin_extras(plug, warnings)
+        if items:
+            extras.setdefault(plug["id"], {"plugin": plug, "items": [], "fixed": 0})
+            extras[plug["id"]]["items"] += items
+            extras[plug["id"]]["fixed"] += sum(i["fixed"] for i in items)
+
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -420,10 +470,12 @@ def build_inventory(home, projects=(), app_data=None, platform_roots=()):
                     "app_data": plain(app_data) if app_data else None},
         "totals": {
             "skills": len(skills),
-            "fixed_tokens": sum(s["tokens"]["fixed"] for s in skills),
+            "fixed_tokens": sum(s["tokens"]["fixed"] for s in skills) + sum(e["fixed"] for e in extras.values()),
+            "extras_fixed_tokens": sum(e["fixed"] for e in extras.values()),
             "estimated": True,
         },
         "skills": skills,
+        "plugin_extras": extras,
         "copy_groups": copy_groups,
         "warnings": warnings,
     }

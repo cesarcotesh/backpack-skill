@@ -184,7 +184,15 @@ def build_audit(inventory, scan, usage=None, today=None):
     for s in skills:
         if s.get("plugin"):
             members.setdefault(s["plugin"]["id"], (s["plugin"], []))[1].append(s)
+    extras = inventory.get("plugin_extras", {})
+    for pid, extra in extras.items():  # plugins with agents or commands but no skills count too
+        members.setdefault(pid, (extra["plugin"], []))
+    used_names = {k.split(":")[0] for k in (usage or {}).get("skills", {})}  # "plugin:agent" or "plugin:skill" in logs
     for pid, (plugin, plugin_skills) in sorted(members.items()):
+        items = extras.get(pid, {}).get("items", [])
+        agents = sum(1 for i in items if i["kind"] == "agent")
+        commands = len(items) - agents
+        extra_fixed = sum(i["fixed"] for i in items)
         result = scan.get("plugins", {}).get(pid) or {"risk": "none", "findings": []}
         plugin_reasons = []
         if result["risk"] in ("high", "medium"):
@@ -195,13 +203,15 @@ def build_audit(inventory, scan, usage=None, today=None):
                 text = t("reason.plugin_security_medium", titles=titles)
             plugin_reasons.append(_reason(f"security_{result['risk']}", text))
         rec = "review" if plugin_reasons else "keep"
-        weight = sum(s["tokens"]["fixed"] for s in plugin_skills)
-        # a plugin is uninstalled as a whole: suggest it only when none of its skills was used
+        weight = sum(s["tokens"]["fixed"] for s in plugin_skills) + extra_fixed
+        # a plugin is uninstalled as a whole: suggest it only when nothing in it (skills, agents, commands) was used
         reviewer = any(scan.get("skills", {}).get(s["id"], {}).get("self") for s in plugin_skills)
-        if (not reviewer and since and weight > 0
+        if (not reviewer and since and weight > 0 and plugin["name"] not in used_names
                 and all(use.get(s["id"], {}).get("count") == 0 for s in plugin_skills)):
+            parts = ", ".join(t(f"parts.{k}" + ("_one" if v == 1 else ""), n=v) for k, v in
+                              (("skills", len(plugin_skills)), ("agents", agents), ("commands", commands)) if v)
             plugin_reasons.insert(0, _reason("unused",
-                t("reason.plugin_unused", count=len(plugin_skills), since=since, tokens=_n(weight))))
+                t("reason.plugin_unused", parts=parts, since=since, tokens=_n(weight))))
             rec = "remove"
         light = "orange" if rec == "remove" else "mustard" if rec == "review" else "green"
         plugin_lights[light] += 1
@@ -212,11 +222,14 @@ def build_audit(inventory, scan, usage=None, today=None):
             "reasons": plugin_reasons,
             "skill_ids": [s["id"] for s in plugin_skills],
             "fixed_tokens": weight,
+            "extras": {"agents": agents, "commands": commands, "fixed": extra_fixed},
             "estimated": True,
         }
 
-    fixed = sum(s["tokens"]["fixed"] for s in skills)
-    savings = sum(s["tokens"]["fixed"] for s in skills if results[s["id"]]["recommendation"] == "remove")
+    extras_fixed = sum(p["extras"]["fixed"] for p in plugins.values())
+    fixed = sum(s["tokens"]["fixed"] for s in skills) + extras_fixed
+    savings = (sum(s["tokens"]["fixed"] for s in skills if results[s["id"]]["recommendation"] == "remove")
+               + sum(p["extras"]["fixed"] for p in plugins.values() if p["recommendation"] == "remove"))
     return {
         "schema_version": SCHEMA_VERSION,
         "lang": lang(),
@@ -227,6 +240,7 @@ def build_audit(inventory, scan, usage=None, today=None):
             "lights": light_totals,
             "plugin_lights": plugin_lights,
             "fixed_tokens": fixed,
+            "extras_fixed_tokens": extras_fixed,
             "fixed_tokens_after_removals": fixed - savings,
             "savings": savings,
             "estimated": True,

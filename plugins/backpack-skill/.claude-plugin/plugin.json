@@ -1,6 +1,6 @@
 {
   "name": "backpack-skill",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Revisa, explica y ayuda a limpiar tus skills de Claude: peso en tokens, copias, skills sin uso, choques y seguridad, en una app visual. Solo lectura.",
   "author": {
     "name": "Cayeyewarrior"

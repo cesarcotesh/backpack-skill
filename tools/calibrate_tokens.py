@@ -10,6 +10,7 @@ import re
 import statistics
 import subprocess
 import sys
+from pathlib import Path
 
 
 def number(text):
@@ -31,12 +32,20 @@ def main(inventory_path):
     for s in inv["skills"]:
         if s.get("plugin"):
             plugins.setdefault(s["plugin"]["root"], (s["plugin"]["name"], {}))[1][s["name"]] = s
-    listing, body, others = [], [], 0.0
+    for pid, extra in inv.get("plugin_extras", {}).items():  # plugins with agents/commands but no skills
+        plugins.setdefault(extra["plugin"]["root"], (extra["plugin"]["name"], {}))
+    # Claude Code labels agents by file name here, though they are invoked by their header name
+    ours_extra = {(e["plugin"]["root"], key): i["fixed"] for e in inv.get("plugin_extras", {}).values()
+                  for i in e["items"] for key in (i["name"], Path(i["path"]).stem)}
+    listing, body, extras, unmatched = [], [], [], 0.0
     for root, (name, skills) in sorted(plugins.items()):
         for comp, (always, invoke) in measure(root, name).items():
             s = skills.get(comp)
             if not s:
-                others += always  # agents, commands: also always-on, not skills
+                if (root, comp) in ours_extra:
+                    extras.append((ours_extra[(root, comp)], always))  # agents and commands
+                else:
+                    unmatched += always
                 continue
             if s["flags"]["model_invocable"]:
                 chars = len(s["name"]) + 2 + len((s["description"] + (" " + s["when_to_use"] if s.get("when_to_use") else ""))[:1536])
@@ -49,7 +58,10 @@ def main(inventory_path):
     print(f"skills compared: {len(listing)}")
     print(f"listing: {k:.2f} chars/token (mean error {mae:.1f} tokens per skill; Claude Code rounds to 10)")
     print(f"body:    {ratio(body):.2f} chars/token over {len(body)} skills")
-    print(f"agents/commands always-on, not counted as skills: ~{others:.0f} tokens")
+    ours, theirs = sum(o for o, _ in extras), sum(t for _, t in extras)
+    print(f"agents/commands: {len(extras)} matched, ours ~{ours:.0f} vs Claude Code ~{theirs:.0f} tokens"
+          f" (mean error {statistics.mean(abs(o - t) for o, t in extras) if extras else 0:.1f})")
+    print(f"components Claude Code counts that we don't: ~{unmatched:.0f} tokens")
 
 
 if __name__ == "__main__":

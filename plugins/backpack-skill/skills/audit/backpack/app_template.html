@@ -190,6 +190,10 @@ const TEXT = {
     youHaveRecipes: n => `Tienes ${fmt(n)} recetas: skills que se llaman entre sí. Busca por lo que quieres lograr.`,
     manualTitle: "Manual", whatDo: "¿Qué quieres hacer?", allRecipes: "← Todas las recetas", skillsTitle: "Skills",
     sortBy: "Ordenar por", sortDesc: "De mayor a menor", sortAsc: "De menor a mayor", sortName: "Nombre",
+    matchesOn: w => `Coincide en: ${w}`,
+    simHow: "Claude elige comparando tu pedido con la descripción de cada skill. Estas comparten palabras clave con lo que escribiste:",
+    extrasLine: (a, c, f) => `Además, ${[a ? `${fmt(a)} ${a === 1 ? "agente" : "agentes"}` : "", c ? `${fmt(c)} ${c === 1 ? "comando" : "comandos"}` : ""].filter(Boolean).join(" y ")}: ~${fmt(f)} tokens en cada conversación (estimado).`,
+    extrasN: n => `${fmt(n)} agentes y comandos de plugins`, extrasSub: "También se cargan en cada conversación",
     pluginLabel: name => `Plugin ${name}`, originTokens: (o, n) => `${o} · ~${fmt(n)} tokens fijos`,
     undo: "Deshacer", didIt: "Ya lo quité", claudeListIntro: "Quiero quitar estas skills y plugins. Guíame paso a paso:\n",
     copyForClaude: "Copiar la lista para Claude", changesTitle: "Cambios",
@@ -251,6 +255,10 @@ const TEXT = {
     youHaveRecipes: n => `You have ${fmt(n)} recipes: skills that call each other. Search by what you want to get done.`,
     manualTitle: "Manual", whatDo: "What do you want to do?", allRecipes: "← All recipes", skillsTitle: "Skills",
     sortBy: "Sort by", sortDesc: "High to low", sortAsc: "Low to high", sortName: "Name",
+    matchesOn: w => `Matches on: ${w}`,
+    simHow: "Claude picks by comparing your request with each skill's description. These share key words with what you typed:",
+    extrasLine: (a, c, f) => `Also ${[a ? `${fmt(a)} ${a === 1 ? "agent" : "agents"}` : "", c ? `${fmt(c)} ${c === 1 ? "command" : "commands"}` : ""].filter(Boolean).join(" and ")}: ~${fmt(f)} tokens in every conversation (estimated).`,
+    extrasN: n => `${fmt(n)} plugin agents and commands`, extrasSub: "They load in every conversation too",
     pluginLabel: name => `Plugin ${name}`, originTokens: (o, n) => `${o} · ~${fmt(n)} fixed tokens`,
     undo: "Undo", didIt: "I removed it", claudeListIntro: "I want to remove these skills and plugins. Guide me step by step:\n",
     copyForClaude: "Copy the list for Claude", changesTitle: "Changes",
@@ -339,7 +347,10 @@ const removable = s => s.rec === "remove" && s.codes.includes("unused");
 function plugOf(s) { return s.plugin ? PL.get(s.plugin) : null; }
 function markKey(s) { return s.plugin ? "P:" + s.plugin : s.id; }
 function markedRemoved(s) { return marks[markKey(s)] === "remove"; }
-function currentLoad() { return D.skills.reduce((t, s) => t + (markedRemoved(s) ? 0 : s.fixed), 0); }
+function currentLoad() {  // skills, plus plugins' agents and commands, minus what's marked for removal
+  return D.skills.reduce((t, s) => t + (markedRemoved(s) ? 0 : s.fixed), 0)
+    + D.plugins.reduce((t, p) => t + (marks["P:" + p.id] === "remove" || !p.extras ? 0 : p.extras.fixed), 0);
+}
 function lastUse(s) {
   const u = s.usage;
   if (!u) return T.noData;
@@ -409,6 +420,8 @@ function screenHome() {
       D.competing.length ? row("#revisar/compiten", "#DCE3DC", "swap", T.pairsN(D.competing.length), T.pairsSub) : null,
       greedy.length ? row("#revisar/se-cuelan", "#F2581D", "arrow", T.greedyN(greedy.length), T.greedySub) : null,
       heavy.length ? row("#revisar/pesadas", "#DCE3DC", "weight", T.heavyN(heavy.length), T.heavySub, `~${fmt(sum(heavy))} tk`) : null,
+      t.extras_fixed_tokens ? row("#revisar/plugins", "#DCE3DC", "bag", T.extrasN(D.plugins.reduce((n, p) => n + (p.extras ? p.extras.agents + p.extras.commands : 0), 0)),
+        T.extrasSub, `~${fmt(t.extras_fixed_tokens)} tk`) : null,
       row("#revisar/seguridad", "#2E6B4E", "shield", T.security,
         risky.length ? T.riskyN(risky.length) : T.riskyNone, null, "#FFFFFF")),
     h("a", { class: "btn primary wide", href: "#revisar" }, T.startReview, icon("arrow", 20)),
@@ -481,6 +494,7 @@ function pluginCard(p) {
       h("div", null, h("dt", null, T.fixedWeight), h("dd", null, `~${fmt(p.fixed)} tokens`)),
       h("div", null, h("dt", null, T.thSkills), h("dd", null, fmt(n)))),
     h("p", { class: "small muted" }, p.skills.slice(0, 12).map(id => SK.get(id).name).join(", ") + (n > 12 ? "…" : "")),
+    p.extras && p.extras.fixed ? h("p", { class: "small" }, T.extrasLine(p.extras.agents, p.extras.commands, p.extras.fixed)) : null,
   ];
 }
 
@@ -643,16 +657,25 @@ const ES_EN = {
 };
 const BAG = new Map(D.skills.map(s => [s.id, words([s.name.replace(/-/g, " "), s.description, s.triggers].join(" "))]));
 function matchSkills(query, only) {
-  // each word of the request counts once, matched by itself or by its translation
-  const groups = [...words(query)].map(w => [w, ...(ES_EN[w] ? words(ES_EN[w]) : [])]);
+  // each word of the request counts once, matched by itself or by its translation; "why" keeps what matched
+  const groups = [], seen = new Set();
+  for (const word of (query || "").toLowerCase().match(/[a-záéíóúñü0-9]+/g) || []) {
+    const w = stem(word);
+    if (word.length <= 2 || STOP.has(word) || seen.has(w)) continue;
+    seen.add(w);
+    groups.push({ word, w, alts: ES_EN[w] ? ES_EN[w].split(" ") : [] });
+  }
   if (!groups.length) return [];
   const out = [];
   for (const s of D.skills) {
     if (only && !only(s)) continue;
-    const bag = BAG.get(s.id);
-    const m = groups.filter(g => g.some(w => bag.has(w))).length;
-    const ratio = m / groups.length;
-    if (m && (groups.length < 3 ? ratio === 1 : m >= 2)) out.push({ s, m, ratio });
+    const bag = BAG.get(s.id), why = [];
+    for (const g of groups) {
+      const alt = bag.has(g.w) ? null : g.alts.find(a => bag.has(stem(a)));
+      if (bag.has(g.w)) why.push(g.word); else if (alt) why.push(`${g.word} → ${alt}`);
+    }
+    const m = why.length, ratio = m / groups.length;
+    if (m && (groups.length < 3 ? ratio === 1 : m >= 2)) out.push({ s, m, ratio, why });
   }
   return out.sort((a, b) => b.m - a.m || b.ratio - a.ratio || a.s.id.localeCompare(b.s.id));
 }
@@ -668,10 +691,12 @@ function screenSimulator() {
     const n = hits.length;
     result = [
       h("div", { class: "stack", style: "gap:4px" }, h("span", { class: "small muted bold" }, T.prediction),
-        h("h2", null, n === 0 ? T.simNone : n === 1 ? T.simOne : T.simMany(n))),
-      n ? h("ol", { class: "stack", style: "margin:0;padding:0;list-style:none" }, hits.map(({ s, ratio }) =>
+        h("h2", null, n === 0 ? T.simNone : n === 1 ? T.simOne : T.simMany(n)),
+        n ? h("p", { class: "small muted" }, T.simHow) : null),
+      n ? h("ol", { class: "stack", style: "margin:0;padding:0;list-style:none" }, hits.map(({ s, ratio, why }) =>
         h("li", null, h("button", { type: "button", class: "row", onclick: () => openSheet(s.id) },
-          h("span", { class: "grow" }, h("span", { class: "mono", style: "overflow-wrap:anywhere" }, s.command), h("span", { class: "small muted" }, s.origin)),
+          h("span", { class: "grow" }, h("span", { class: "mono", style: "overflow-wrap:anywhere" }, s.command), h("span", { class: "small muted" }, s.origin),
+            h("span", { class: "small" }, T.matchesOn(why.join(", ")))),
           h("span", { class: `tag ${ratio >= 0.6 ? "orange" : "mustard"}` }, ratio >= 0.6 ? T.high : T.medium))))) : null,
       h("p", { class: "note" }, n === 0 ? T.simNoneNote
         : n === 1 ? T.simOneNote : T.simManyNote(n)),

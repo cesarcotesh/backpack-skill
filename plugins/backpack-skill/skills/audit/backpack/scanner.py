@@ -223,6 +223,7 @@ def scan_inventory(inventory):
 
     plugins = {}
     roots = {s["plugin"]["id"]: Path(s["plugin"]["root"]) for s in inventory["skills"] if s.get("plugin")}
+    roots.update({pid: Path(e["plugin"]["root"]) for pid, e in inventory.get("plugin_extras", {}).items()})
     for pid, root in sorted(roots.items()):
         try:
             plugins[pid] = scan_plugin(root)
