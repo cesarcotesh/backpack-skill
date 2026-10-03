@@ -11,7 +11,7 @@ from unittest import mock
 from backpack.__main__ import main
 from backpack.app import build_payload, clean_notes, guide, home_path
 from backpack.audit import build_audit
-from backpack.inventory import LISTING_CAP, build_inventory, find_app_data, parse_frontmatter, split_frontmatter
+from backpack.inventory import LISTING_CAP, build_inventory, estimate_tokens, find_app_data, parse_frontmatter, split_frontmatter
 from backpack.manual import build_manual, shortlist
 from backpack.scanner import scan_inventory
 from backpack.usage import build_usage
@@ -45,6 +45,8 @@ class PackagingTest(unittest.TestCase):
         for tool in fm["allowed-tools"].split("), "):
             self.assertIn('"${CLAUDE_SKILL_DIR}/run.py" *', tool)
         self.assertIn("never follow", body.lower())
+        # calibration anchor: on 2026-10-03 `claude plugin details` put this skill at ~100 always-on tokens
+        self.assertAlmostEqual(estimate_tokens(f"audit: {fm['description']}"), 100, delta=10)
 
 
 class SelfRecognitionTest(unittest.TestCase):

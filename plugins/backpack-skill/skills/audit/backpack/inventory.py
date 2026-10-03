@@ -23,15 +23,19 @@ from pathlib import Path
 from .i18n import t
 
 SCHEMA_VERSION = 1
-CHARS_PER_TOKEN = 3.7  # ponytail: char heuristic from SPEC; exact counts need the Anthropic API (network)
+# Calibrated 2026-10-03 against Claude Code's own estimate (`claude plugin details`, offline) on 290 plugin
+# skills: listing text ~2.9 chars/token (mean error 6 tokens per skill; the reference rounds to 10) and skill
+# bodies ~2.8. Re-run tools/calibrate_tokens.py when Claude Code changes how it loads skills.
+LISTING_CHARS_PER_TOKEN = 2.9
+BODY_CHARS_PER_TOKEN = 2.8
 LISTING_CAP = 1536  # description + when_to_use are cut here in the skill listing (Claude Code docs)
 MAX_READ = 1_000_000  # bytes read per file
 
 _KEY = re.compile(r"^([A-Za-z0-9_-]+):(.*)$")
 
 
-def estimate_tokens(text):
-    return round(len(text) / CHARS_PER_TOKEN)
+def estimate_tokens(text, chars_per_token=LISTING_CHARS_PER_TOKEN):
+    return round(len(text) / chars_per_token)
 
 
 def fs_path(path):
@@ -217,7 +221,7 @@ def read_skill(skill_md, dir_name, scope, plugin, warnings, skill_enabled=None, 
         "allowed_tools": fm.get("allowed-tools"),
         "tokens": {
             "fixed": estimate_tokens(f"{name}: {listing}") if model_invocable and loaded else 0,
-            "body": estimate_tokens(body),
+            "body": estimate_tokens(body, BODY_CHARS_PER_TOKEN),
             "estimated": True,
         },
         "sha256": hashlib.sha256(raw).hexdigest(),
@@ -410,7 +414,8 @@ def build_inventory(home, projects=(), app_data=None, platform_roots=()):
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "estimator": {"method": "chars_per_token", "chars_per_token": CHARS_PER_TOKEN, "estimated": True},
+        "estimator": {"method": "chars_per_token", "listing": LISTING_CHARS_PER_TOKEN, "body": BODY_CHARS_PER_TOKEN,
+                      "calibrated_against": "claude plugin details", "estimated": True},
         "sources": {"home": plain(home), "projects": [plain(p) for p in projects],
                     "app_data": plain(app_data) if app_data else None},
         "totals": {
