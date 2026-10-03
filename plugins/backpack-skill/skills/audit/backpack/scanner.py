@@ -11,7 +11,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .inventory import MAX_READ, fs_path, parse_frontmatter, split_frontmatter
+from .inventory import MAX_READ, fs_path, parse_frontmatter, plain, split_frontmatter
 
 SCHEMA_VERSION = 1
 SEVERITY_ORDER = ["none", "low", "medium", "high"]
@@ -216,6 +216,20 @@ def _scan_folder(skill_dir, skip_top=frozenset()):
     return {"risk": risk, "findings": findings, "truncated": truncated}
 
 
+SELF_DIR = Path(__file__).resolve().parent.parent  # the skill folder this code is running from
+
+
+def is_self(skill_dir):
+    """True only for the folder this very code runs from. Its rules contain the patterns they
+    look for, so it always has findings; the risk stays as computed and the page says why.
+    Recognition is by location, not by content: another skill can't claim to be this one."""
+    try:
+        here = os.path.normcase(plain(fs_path(skill_dir).resolve()))
+    except OSError:
+        return False
+    return here == os.path.normcase(plain(fs_path(SELF_DIR)))
+
+
 def scan_inventory(inventory):
     results, warnings, by_dir = {}, [], {}
     for skill in inventory["skills"]:
@@ -231,7 +245,7 @@ def scan_inventory(inventory):
                 warnings.append({"path": str(skill_dir), "code": "skill_unreadable",
                                  "message": "No se pudo revisar esta skill."})
                 continue
-        results[skill["id"]] = by_dir[skill_dir]
+        results[skill["id"]] = {**by_dir[skill_dir], "self": is_self(skill_dir)}
 
     plugins = {}
     roots = {s["plugin"]["id"]: Path(s["plugin"]["root"]) for s in inventory["skills"] if s.get("plugin")}

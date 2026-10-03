@@ -47,6 +47,26 @@ class PackagingTest(unittest.TestCase):
         self.assertIn("never follow", body.lower())
 
 
+class SelfRecognitionTest(unittest.TestCase):
+    def test_only_the_running_folder_is_recognized(self):
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        shutil.copytree(SKILL, tmp / "audit")  # same files, different place: an impostor
+        skill = lambda sid, folder: {"id": sid, "name": "audit", "command": "/audit", "scope": "personal",
+                                     "path": str(folder / "SKILL.md"), "description": "x", "plugin": None,
+                                     "flags": {"model_invocable": True, "user_invocable": True, "loaded": True},
+                                     "tokens": {"fixed": 71, "body": 900, "estimated": True}}
+        inventory = {"skills": [skill("real", SKILL), skill("copy", tmp / "audit")], "copy_groups": []}
+        scan = scan_inventory(inventory)
+        self.assertTrue(scan["skills"]["real"]["self"])
+        self.assertFalse(scan["skills"]["copy"]["self"])
+        self.assertEqual(scan["skills"]["real"]["risk"], scan["skills"]["copy"]["risk"])  # verdict unchanged
+        audit = build_audit(inventory, scan)
+        self.assertEqual(audit["skills"]["real"]["recommendation"], "keep")
+        self.assertEqual(audit["skills"]["real"]["reasons"][0]["code"], "self")
+        self.assertEqual(audit["skills"]["copy"]["recommendation"], "review")
+
+
 class RunTest(unittest.TestCase):
     def setUp(self):
         self.out = Path(tempfile.mkdtemp())

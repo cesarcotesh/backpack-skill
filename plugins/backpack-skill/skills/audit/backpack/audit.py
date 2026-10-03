@@ -159,7 +159,14 @@ def build_audit(inventory, scan, usage=None, today=None):
 
         # security of the skill's own folder; the rest of a plugin is judged once, under "plugins"
         result = scan.get("skills", {}).get(sid)
-        if result and result["risk"] in ("high", "medium"):
+        if result and result.get("self"):
+            # the reviewer itself: same findings, told plainly; never suggested for removal
+            titles = ", ".join(_risk_titles(result, rules)).lower() or "ninguno"
+            reasons[sid] = [_reason("self",
+                "Esta es Backpack Skill, la herramienta que hace esta revisión. Sus reglas contienen los patrones "
+                f"que buscan ({titles}), por eso aparecen hallazgos. Su código es abierto: puedes revisarlo.")]
+            recs[sid] = set()
+        elif result and result["risk"] in ("high", "medium"):
             titles = ", ".join(_risk_titles(result, rules)).lower()
             if result["risk"] == "high":
                 text = f"La revisión de seguridad encontró algo serio: {titles}. Revísala antes de seguir usándola."
