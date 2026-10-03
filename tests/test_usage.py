@@ -54,12 +54,26 @@ class UsageTest(unittest.TestCase):
         trip = s["plugin:travel@knowledge-work-plugins/plan-trip"]
         self.assertEqual(trip["usage"]["days_unused"], 85)
         self.assertIn("No la usas hace 85 días.", [r["text"] for r in trip["reasons"]])
-        notes = [r["text"] for r in s["personal:notes"]["reasons"]]
-        self.assertIn("No hay registro de uso desde el 2026-07-10 (hace 85 días).", notes)
-        self.assertEqual(s["personal:notes"]["light"], "green")  # usage informs, it doesn't change the light
+        self.assertEqual(trip["light"], "green")  # used 85 days ago: mentioned, not removed
+        notes = s["personal:notes"]
+        self.assertEqual((notes["light"], notes["recommendation"]), ("orange", "remove"))
+        self.assertTrue(notes["reasons"][-1]["text"].startswith("No hay registro de uso desde el 2026-07-10 (hace 85 días). Igual ocupa"))
+        deploy = s["personal:deploy"]  # unused, but only runs when typed: weighs nothing, so it stays
+        self.assertEqual(deploy["recommendation"], "keep")
+        self.assertIn("unused", {r["code"] for r in deploy["reasons"]})
         t = audit["totals"]
         self.assertEqual(t["usage_history_since"], "2026-07-10")
         self.assertEqual(t["unused_skills"], sum(1 for x in s.values() if x["usage"]["count"] == 0))
+        self.assertEqual(t["savings"], sum(x["tokens"]["fixed"] for x in s.values() if x["recommendation"] == "remove"))
+
+    def test_plugin_removed_only_when_none_of_its_skills_is_used(self):
+        inventory = build_inventory(HOME, [], APP)
+        plugins = build_audit(inventory, scan_inventory(inventory), self.usage, today=date(2026, 10, 3))["plugins"]
+        self.assertEqual(plugins["toolkit@acme"]["recommendation"], "keep")  # review is used, changelog isn't
+        self.assertEqual(plugins["travel@knowledge-work-plugins"]["recommendation"], "keep")
+        self.assertEqual(plugins["docs-kit@anthropic-plugin-directory"]["recommendation"], "remove")
+        self.assertEqual(plugins["docs-kit@anthropic-plugin-directory"]["light"], "orange")
+        self.assertEqual(plugins["dormant@acme"]["recommendation"], "keep")  # disabled: frees nothing
 
     def test_audit_without_usage(self):
         inventory = build_inventory(HOME)

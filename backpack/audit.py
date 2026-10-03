@@ -144,8 +144,11 @@ def build_audit(inventory, scan, usage=None, today=None):
             reasons[sid].append(_reason("disabled", "Está desactivada, así que hoy no pesa."))
         u = use.get(sid)
         if u and u["count"] == 0 and since:
-            reasons[sid].append(_reason("unused",
-                f"No hay registro de uso desde el {since} (hace {days_since(since, today)} días)."))
+            text = f"No hay registro de uso desde el {since} (hace {days_since(since, today)} días)."
+            if s["tokens"]["fixed"] > 0:  # disabled or slash-only skills don't weigh on every conversation
+                text += f" Igual ocupa ~{s['tokens']['fixed']} tokens en cada conversación (estimado); conviene quitarla."
+                recs[sid].add("remove")
+            reasons[sid].append(_reason("unused", text))
         elif u and u["days_unused"] is not None and u["days_unused"] >= UNUSED_DAYS:
             reasons[sid].append(_reason("unused", f"No la usas hace {u['days_unused']} días."))
 
@@ -170,7 +173,7 @@ def build_audit(inventory, scan, usage=None, today=None):
                         "tokens": s["tokens"], "usage": use.get(sid)}
 
     # plugins are what gets uninstalled, so their own files (hooks, servers, commands) are judged here once
-    plugins, plugin_lights = {}, {"mustard": 0, "green": 0}
+    plugins, plugin_lights = {}, {"orange": 0, "mustard": 0, "green": 0}
     members = {}
     for s in skills:
         if s.get("plugin"):
@@ -185,15 +188,23 @@ def build_audit(inventory, scan, usage=None, today=None):
             else:
                 text = f"Fuera de sus skills, el plugin trae algo para revisar: {titles}."
             plugin_reasons.append(_reason(f"security_{result['risk']}", text))
-        light = "mustard" if plugin_reasons else "green"
+        rec = "review" if plugin_reasons else "keep"
+        weight = sum(s["tokens"]["fixed"] for s in plugin_skills)
+        # a plugin is uninstalled as a whole: suggest it only when none of its skills was used
+        if since and weight > 0 and all(use.get(s["id"], {}).get("count") == 0 for s in plugin_skills):
+            plugin_reasons.insert(0, _reason("unused",
+                f"No usas ninguna de sus {len(plugin_skills)} skills desde el {since}. "
+                f"Quitar el plugin libera ~{weight} tokens en cada conversación (estimado)."))
+            rec = "remove"
+        light = "orange" if rec == "remove" else "mustard" if rec == "review" else "green"
         plugin_lights[light] += 1
         plugins[pid] = {
             "name": plugin["name"],
             "light": light,
-            "recommendation": "review" if plugin_reasons else "keep",
+            "recommendation": rec,
             "reasons": plugin_reasons,
             "skill_ids": [s["id"] for s in plugin_skills],
-            "fixed_tokens": sum(s["tokens"]["fixed"] for s in plugin_skills),
+            "fixed_tokens": weight,
             "estimated": True,
         }
 
