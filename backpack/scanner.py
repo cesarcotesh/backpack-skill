@@ -11,7 +11,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .inventory import MAX_READ, parse_frontmatter, split_frontmatter
+from .inventory import MAX_READ, fs_path, parse_frontmatter, split_frontmatter
 
 SCHEMA_VERSION = 1
 SEVERITY_ORDER = ["none", "low", "medium", "high"]
@@ -125,8 +125,9 @@ class _Scan:
 
     def scan_text(self, rel, text, is_skill_md):
         lines = text.splitlines()
-        if (Path(rel).suffix.lower() in SCRIPT_EXT or rel.startswith("bin/")  # plugin bin/ is on the Bash PATH
-                or (lines and lines[0].startswith("#!"))):
+        is_script = (Path(rel).suffix.lower() in SCRIPT_EXT or rel.startswith("bin/")  # plugin bin/ is on the Bash PATH
+                     or bool(lines and lines[0].startswith("#!")))
+        if is_script:
             self.add("R01", rel, 1, lines[0] if lines else "")
         component = PLUGIN_COMPONENTS.get(rel)
         if component:
@@ -142,7 +143,8 @@ class _Scan:
             for rule, rx in LINE_RULES:
                 if rx.search(line):
                     self.add(rule, rel, no, line)
-            if _network(line):
+            # outside scripts a bare link is just documentation; only commands that reach out count
+            if _network(line) and (is_script or _NET_CMD.search(line)):
                 self.add("R02", rel, no, line)
             if is_skill_md and _INJECTED.search(line):
                 self.add("R08", rel, no, line)
@@ -167,13 +169,13 @@ class _Scan:
 
 def scan_skill(skill_dir):
     """Scan one skill folder. Returns {"risk", "findings", "truncated"}."""
-    return _scan_folder(Path(skill_dir))
+    return _scan_folder(fs_path(skill_dir))
 
 
 def scan_plugin(plugin_root):
     """Scan a plugin's own files (hooks, MCP/LSP servers, bin/, commands, agents...).
     Its skills/ folder is left out: each skill there is scanned on its own."""
-    return _scan_folder(Path(plugin_root), skip_top={"skills"})
+    return _scan_folder(fs_path(plugin_root), skip_top={"skills"})
 
 
 def _scan_folder(skill_dir, skip_top=frozenset()):

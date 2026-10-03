@@ -27,7 +27,9 @@ class ScannerTest(unittest.TestCase):
         expected = {
             "clean": ("none", set()),
             "script-only": ("low", {("R01", "count.py", 1)}),
-            "network": ("medium", {("R02", "SKILL.md", 7)}),  # line 6 points at an allowed domain
+            # line 6: allowed domain; line 8: bare link in prose (documentation, not a call)
+            "network": ("medium", {("R02", "SKILL.md", 7), ("R01", "fetch.py", 1),
+                                   ("R02", "fetch.py", 1), ("R02", "fetch.py", 2)}),
             "destructive": ("high", {("R03", "SKILL.md", 7)}),
             "obfuscated": ("high", {("R04", "SKILL.md", 7), ("R04", "SKILL.md", 8)}),
             "secrets": ("high", {("R01", "helper.sh", 1), ("R05", "helper.sh", 2), ("R05", "helper.sh", 3)}),
