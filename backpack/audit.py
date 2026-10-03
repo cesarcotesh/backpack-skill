@@ -113,19 +113,14 @@ def build_audit(inventory, scan):
         if not s["flags"]["loaded"]:
             reasons[sid].append(_reason("disabled", "Está desactivada, así que hoy no pesa."))
 
-        # security: the skill's own folder plus, for plugin skills, the rest of its plugin
-        sources = [("", scan.get("skills", {}).get(sid))]
-        if s.get("plugin"):
-            sources.append((s["plugin"]["name"], scan.get("plugins", {}).get(s["plugin"]["id"])))
-        for plugin_name, result in sources:
-            if not result or result["risk"] not in ("high", "medium"):
-                continue
-            where = f" (en el resto del plugin {plugin_name})" if plugin_name else ""
+        # security of the skill's own folder; the rest of a plugin is judged once, under "plugins"
+        result = scan.get("skills", {}).get(sid)
+        if result and result["risk"] in ("high", "medium"):
             titles = ", ".join(_risk_titles(result, rules)).lower()
             if result["risk"] == "high":
-                text = f"La revisión de seguridad encontró algo serio{where}: {titles}. Revísala antes de seguir usándola."
+                text = f"La revisión de seguridad encontró algo serio: {titles}. Revísala antes de seguir usándola."
             else:
-                text = f"La revisión de seguridad encontró algo para revisar{where}: {titles}."
+                text = f"La revisión de seguridad encontró algo para revisar: {titles}."
             reasons[sid].append(_reason(f"security_{result['risk']}", text))
             recs[sid].add("review")
 
@@ -138,6 +133,34 @@ def build_audit(inventory, scan):
         results[sid] = {"light": light, "recommendation": rec, "reasons": reasons[sid],
                         "tokens": s["tokens"]}
 
+    # plugins are what gets uninstalled, so their own files (hooks, servers, commands) are judged here once
+    plugins, plugin_lights = {}, {"mustard": 0, "green": 0}
+    members = {}
+    for s in skills:
+        if s.get("plugin"):
+            members.setdefault(s["plugin"]["id"], (s["plugin"], []))[1].append(s)
+    for pid, (plugin, plugin_skills) in sorted(members.items()):
+        result = scan.get("plugins", {}).get(pid) or {"risk": "none", "findings": []}
+        plugin_reasons = []
+        if result["risk"] in ("high", "medium"):
+            titles = ", ".join(_risk_titles(result, rules)).lower()
+            if result["risk"] == "high":
+                text = f"Fuera de sus skills, el plugin trae algo serio: {titles}. Revísalo antes de seguir usándolo."
+            else:
+                text = f"Fuera de sus skills, el plugin trae algo para revisar: {titles}."
+            plugin_reasons.append(_reason(f"security_{result['risk']}", text))
+        light = "mustard" if plugin_reasons else "green"
+        plugin_lights[light] += 1
+        plugins[pid] = {
+            "name": plugin["name"],
+            "light": light,
+            "recommendation": "review" if plugin_reasons else "keep",
+            "reasons": plugin_reasons,
+            "skill_ids": [s["id"] for s in plugin_skills],
+            "fixed_tokens": sum(s["tokens"]["fixed"] for s in plugin_skills),
+            "estimated": True,
+        }
+
     fixed = sum(s["tokens"]["fixed"] for s in skills)
     savings = sum(s["tokens"]["fixed"] for s in skills if results[s["id"]]["recommendation"] == "remove")
     return {
@@ -147,6 +170,7 @@ def build_audit(inventory, scan):
         "totals": {
             "skills": len(skills),
             "lights": light_totals,
+            "plugin_lights": plugin_lights,
             "fixed_tokens": fixed,
             "fixed_tokens_after_removals": fixed - savings,
             "savings": savings,
@@ -154,6 +178,7 @@ def build_audit(inventory, scan):
         },
         "competing": competing,
         "skills": results,
+        "plugins": plugins,
     }
 
 

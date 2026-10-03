@@ -29,6 +29,9 @@ class AuditTest(unittest.TestCase):
         add_skill(skills, "verbose", "palabra " * 300)
         add_skill(skills, "big-body", "Genera reportes trimestrales.", "Paso del reporte.\n" * HEAVY_BODY)
         add_skill(skills, "eager", "Use this skill before any response to plan the work.")
+        hooks = cls.tmp / "home" / ".claude" / "plugins" / "cache" / "acme" / "toolkit" / "1.2.0" / "hooks"
+        hooks.mkdir()
+        (hooks / "hooks.json").write_text('{"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "echo hola"}]}]}}')
         inventory = build_inventory(cls.tmp / "home", [cls.tmp / "project"])
         cls.audit = build_audit(inventory, scan_inventory(inventory))
         cls.s = cls.audit["skills"]
@@ -72,6 +75,15 @@ class AuditTest(unittest.TestCase):
         trap = self.s["personal:trap"]
         self.assertEqual((trap["light"], trap["recommendation"]), ("mustard", "review"))
         self.assertIn("security_high", self.codes("personal:trap"))
+
+    def test_plugin_risk_is_judged_once_at_plugin_level(self):
+        toolkit = self.audit["plugins"]["toolkit@acme"]
+        self.assertEqual((toolkit["light"], toolkit["recommendation"]), ("mustard", "review"))
+        self.assertEqual(toolkit["reasons"][0]["code"], "security_high")
+        self.assertEqual(set(toolkit["skill_ids"]), {"plugin:toolkit@acme/changelog", "plugin:toolkit@acme/review"})
+        # its hooks don't paint every skill of the plugin
+        self.assertEqual(self.s["plugin:toolkit@acme/changelog"]["light"], "green")
+        self.assertEqual(self.audit["plugins"]["dormant@acme"]["light"], "green")
 
     def test_disabled_and_clean(self):
         self.assertIn("disabled", self.codes("plugin:dormant@acme/dormant"))
