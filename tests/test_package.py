@@ -100,6 +100,24 @@ class RunTest(unittest.TestCase):
             self.assertEqual(default_out(), Path.home() / ".backpack-skill")
 
 
+class LightVersionTest(unittest.TestCase):
+    def test_platform_mounted_skills(self):
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        (tmp / "user" / "brand").mkdir(parents=True)
+        (tmp / "user" / "brand" / "SKILL.md").write_text("---\nname: brand\ndescription: Tono de marca.\n---\n", encoding="utf-8")
+        with mock.patch("sys.stdout"):
+            main(["run", "--home", str(tmp / "no-home"), "--app-data", "none", "--skills-root", str(tmp / "user"),
+                  "--project", str(tmp / "none"), "--out", str(tmp / "out"), "--no-open"])
+        inv = json.loads((tmp / "out" / "inventory.json").read_text(encoding="utf-8"))
+        (skill,) = inv["skills"]
+        self.assertEqual((skill["id"], skill["origin"]), ("platform:user/brand", {"type": "platform"}))
+        audit = json.loads((tmp / "out" / "audit.json").read_text(encoding="utf-8"))
+        self.assertIsNone(audit["totals"]["usage_history_since"])  # no logs here: no usage claims
+        self.assertEqual(audit["skills"]["platform:user/brand"]["recommendation"], "keep")
+        self.assertIn("Customize > Skills", (tmp / "out" / "mochila.html").read_text(encoding="utf-8"))
+
+
 class AppDataTest(unittest.TestCase):
     def test_finds_store_install_before_roaming(self):
         tmp = Path(tempfile.mkdtemp())
@@ -123,7 +141,7 @@ class GuideTest(unittest.TestCase):
         scan = scan_inventory(inv)
         audit = build_audit(inv, scan, build_usage(FIXTURES / "home", FIXTURES / "appdata"), today=date(2026, 10, 3))
         cls.inv, cls.audit, cls.manual = inv, audit, build_manual(inv, scan, audit)
-        cls.payload = build_payload(inv, scan, audit, cls.manual, {"personal:review": "Nota‮ de Claude", "ghost": "x"})
+        cls.payload = build_payload(inv, scan, audit, cls.manual, {"personal:review": "Nota\u202e de Claude", "ghost": "x"})
         cls.skills = {s["id"]: s for s in cls.payload["skills"]}
         cls.plugins = {p["id"]: p for p in cls.payload["plugins"]}
 
