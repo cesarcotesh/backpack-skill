@@ -1,5 +1,7 @@
 # Backpack Skill
 
+*[Read in English](README.en.md)*
+
 Revisa, explica y ayuda a limpiar las skills que Claude carga en cada conversación. Pensada para principiantes.
 
 Cada skill instalada suma peso a la "mochila" de Claude, aunque nunca la uses. Backpack Skill te muestra cuánto pesa la tuya, qué está repetido, qué no usas, qué compite entre sí y qué conviene revisar por seguridad, y te guía para quitar lo que sobra.
@@ -20,6 +22,8 @@ Necesitas **Python 3.9 o superior**. Si no lo tienes, Claude te explica cómo in
 ```
 npx skills add cesarcotesh/backpack-skill
 ```
+
+**claude.ai** (versión ligera): descarga el zip del [último release](https://github.com/cesarcotesh/backpack-skill/releases) y súbelo en Customize > Skills.
 
 ## Usar
 
@@ -44,12 +48,13 @@ Todas las cifras de tokens son **estimadas**.
 - **Sin red y sin telemetría.** La página bloquea cualquier conexión.
 - **Privacidad:** de tu historial de sesiones solo lee nombres de skills y fechas, nunca tus conversaciones.
 
-La revisión automática **reduce el riesgo, pero no garantiza** que una skill sea segura.
+La revisión automática **reduce el riesgo, pero no garantiza** que una skill sea segura. Ver [SECURITY.md](SECURITY.md).
 
 ## Para desarrollar
 
 ```
 python -m unittest
+python tools/build_release.py
 ```
 
 Los tests corren sobre `tests/fixtures/`, skills de ejemplo creadas para esto (algunas imitan skills maliciosas, sin hacer daño).
