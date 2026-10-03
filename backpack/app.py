@@ -15,10 +15,9 @@ from .audit import STOPWORDS
 
 TEMPLATE = Path(__file__).with_name("app_template.html")
 FONTS_DIR = Path(__file__).parent / "assets" / "fonts"
-# file name -> (family, weight)
+# file name -> (family, weight or weight range); Google Fonts "latin" subsets, SIL OFL 1.1
 FONT_FILES = {
-    "bricolage-grotesque-600.woff2": ("Bricolage Grotesque", 600),
-    "bricolage-grotesque-800.woff2": ("Bricolage Grotesque", 800),
+    "bricolage-grotesque.woff2": ("Bricolage Grotesque", "600 800"),  # variable font: one file, both weights
     "atkinson-hyperlegible-400.woff2": ("Atkinson Hyperlegible", 400),
     "atkinson-hyperlegible-700.woff2": ("Atkinson Hyperlegible", 700),
     "ibm-plex-mono-500.woff2": ("IBM Plex Mono", 500),
