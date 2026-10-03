@@ -44,6 +44,11 @@ def similarity(a, b):
     return len(a & b) / len(a | b) if a and b else 0.0
 
 
+def _n(number):
+    """9394 -> '9.394', as the app shows numbers."""
+    return f"{number:,}".replace(",", ".")
+
+
 def _reason(code, text, related=()):
     return {"code": code, "text": text, "related": list(related)}
 
@@ -134,11 +139,11 @@ def build_audit(inventory, scan, usage=None, today=None):
             recs[sid].add("tune")
         if s["tokens"]["fixed"] >= HEAVY_FIXED:
             reasons[sid].append(_reason("heavy_fixed",
-                f"Su descripción es larga: ocupa ~{s['tokens']['fixed']} tokens en cada conversación (estimado)."))
+                f"Su descripción es larga: ocupa ~{_n(s['tokens']['fixed'])} tokens en cada conversación (estimado)."))
             recs[sid].add("tune")
         if s["tokens"]["body"] >= HEAVY_BODY:
             reasons[sid].append(_reason("heavy_body",
-                f"Al activarse carga ~{s['tokens']['body']} tokens (estimado)."))
+                f"Al activarse carga ~{_n(s['tokens']['body'])} tokens (estimado)."))
             recs[sid].add("tune")
         if not s["flags"]["loaded"]:
             reasons[sid].append(_reason("disabled", "Está desactivada, así que hoy no pesa."))
@@ -146,7 +151,7 @@ def build_audit(inventory, scan, usage=None, today=None):
         if u and u["count"] == 0 and since:
             text = f"No hay registro de uso desde el {since} (hace {days_since(since, today)} días)."
             if s["tokens"]["fixed"] > 0:  # disabled or slash-only skills don't weigh on every conversation
-                text += f" Igual ocupa ~{s['tokens']['fixed']} tokens en cada conversación (estimado); conviene quitarla."
+                text += f" Igual ocupa ~{_n(s['tokens']['fixed'])} tokens en cada conversación (estimado); conviene quitarla."
                 recs[sid].add("remove")
             reasons[sid].append(_reason("unused", text))
         elif u and u["days_unused"] is not None and u["days_unused"] >= UNUSED_DAYS:
@@ -194,7 +199,7 @@ def build_audit(inventory, scan, usage=None, today=None):
         if since and weight > 0 and all(use.get(s["id"], {}).get("count") == 0 for s in plugin_skills):
             plugin_reasons.insert(0, _reason("unused",
                 f"No usas ninguna de sus {len(plugin_skills)} skills desde el {since}. "
-                f"Quitar el plugin libera ~{weight} tokens en cada conversación (estimado)."))
+                f"Quitar el plugin libera ~{_n(weight)} tokens en cada conversación (estimado)."))
             rec = "remove"
         light = "orange" if rec == "remove" else "mustard" if rec == "review" else "green"
         plugin_lights[light] += 1

@@ -2,6 +2,7 @@ import argparse
 import json
 import sys
 
+from .app import build_app, write_app
 from .audit import build_audit, write_audit
 from .inventory import build_inventory, write_inventory
 from .manual import build_manual, write_manual
@@ -36,7 +37,19 @@ def main(argv=None):
     man.add_argument("--scan", default="out/scan.json", help="Ruta de scan.json.")
     man.add_argument("--audit", default="out/audit.json", help="Ruta de audit.json.")
     man.add_argument("--out", default="out", help="Carpeta donde se guarda manual.json.")
+    ui = sub.add_parser("app", help="Arma la interfaz: un único archivo mochila.html con todo adentro.")
+    ui.add_argument("--data", default="out", help="Carpeta con inventory, scan, audit y manual (.json).")
+    ui.add_argument("--out", default="out", help="Carpeta donde se guarda mochila.html.")
     args = parser.parse_args(argv)
+
+    if args.command == "app":
+        loaded = []
+        for name in ("inventory", "scan", "audit", "manual"):
+            with open(f"{args.data}/{name}.json", encoding="utf-8") as f:
+                loaded.append(json.load(f))
+        path = write_app(build_app(*loaded), args.out)
+        print(f"Interfaz lista: ábrela con doble clic, sin conexión. Guardada en {path}")
+        return 0
 
     if args.command == "manual":
         loaded = []

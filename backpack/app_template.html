@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; font-src data:; img-src data:">
+<title>Tu mochila · Backpack Skill</title>
+<style>
+/*__FONTS__*/
+:root {
+  --bg: #EEF1EC; --surface: #FFFFFF; --ink: #16201A; --ink-2: #4C5A51;
+  --line: #D5DDD6; --neutral: #DCE3DC; --orange: #F2581D; --mustard: #E9B425;
+  --mustard-tint: #FBF0CF; --pine: #2E6B4E; --side-muted: #C9D3CC;
+  --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+  --text: 'Atkinson Hyperlegible', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.4 var(--text); }
+button, input { font: inherit; color: inherit; }
+a { color: var(--ink); }
+a:hover { color: var(--pine); }
+:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+h1, h2, h3 { margin: 0; font-family: var(--display); }
+h1 { font-weight: 800; font-size: 30px; line-height: 1.1; letter-spacing: -0.6px; }
+h2 { font-weight: 600; font-size: 19px; }
+h3 { font-weight: 600; font-size: 16px; }
+p { margin: 0; }
+.mono { font-family: var(--mono); font-weight: 600; }
+.muted { color: var(--ink-2); }
+.small { font-size: 14px; }
+.tiny { font-size: 13px; }
+.bold { font-weight: 700; }
+.wordmark { font-family: var(--display); font-weight: 800; font-size: 28px; letter-spacing: -0.5px; }
+.wordmark span { color: var(--orange); }
+
+/* layout: bottom nav on phones, dark side menu from 900px */
+.shell { min-height: 100vh; display: flex; flex-direction: column; }
+.side { display: none; }
+main { flex: 1; padding: 20px 16px 110px; display: flex; flex-direction: column; gap: 16px; max-width: 1180px; width: 100%; margin: 0 auto; }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); background: var(--surface); border-top: 1px solid var(--line); padding: 8px 4px 14px; z-index: 5; }
+.bottom-nav a { display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 52px; text-decoration: none; color: var(--ink-2); font-size: 12px; }
+.bottom-nav a .pill { display: flex; align-items: center; justify-content: center; width: 52px; height: 30px; border-radius: 15px; }
+.bottom-nav a[aria-current="page"] { color: var(--ink); font-weight: 700; }
+.bottom-nav a[aria-current="page"] .pill { background: var(--orange); }
+@media (min-width: 900px) {
+  .shell { flex-direction: row; }
+  .side { display: flex; flex-direction: column; gap: 28px; width: 240px; flex: none; background: var(--ink); color: #FFF; padding: 28px 18px; position: sticky; top: 0; height: 100vh; }
+  .side nav { display: flex; flex-direction: column; gap: 6px; }
+  .side nav a { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: 12px; color: #FFF; text-decoration: none; font-size: 15px; }
+  .side nav a[aria-current="page"] { background: var(--orange); color: var(--ink); font-weight: 700; }
+  .side .foot { margin-top: auto; display: flex; flex-direction: column; gap: 14px; padding: 0 10px; font-size: 13px; color: var(--side-muted); }
+  .bottom-nav, .topbar, .desk-hide { display: none; }
+  main { width: auto; min-width: 0; padding: 36px 40px 48px; gap: 24px; }
+  h1 { font-size: 40px; letter-spacing: -1px; }
+}
+
+/* parts */
+.card { background: var(--surface); border-radius: 24px; padding: 22px; }
+.row { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 14px; background: var(--surface); border-radius: 18px; text-decoration: none; color: var(--ink); border: none; width: 100%; text-align: left; cursor: pointer; }
+.dot { flex: none; width: 40px; height: 40px; border-radius: 20px; display: flex; align-items: center; justify-content: center; }
+.grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.big { font-family: var(--display); font-weight: 800; font-size: 52px; line-height: 1; letter-spacing: -2px; }
+.stack { display: flex; flex-direction: column; gap: 8px; }
+.wrap { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 20px; border-radius: 24px; border: 1.5px solid var(--ink); background: transparent; font-weight: 700; cursor: pointer; text-decoration: none; color: var(--ink); }
+.btn.primary { background: var(--ink); color: #FFF; }
+.btn.remove { background: var(--orange); border-color: var(--orange); color: var(--ink); }
+.btn.keep { background: var(--pine); border-color: var(--pine); color: #FFF; }
+.btn.wide { width: 100%; min-height: 56px; border-radius: 28px; font-size: 17px; }
+.chip { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 18px; border: 1.5px solid var(--line); background: transparent; font-weight: 700; font-size: 13px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #FFF; }
+.tag { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; background: var(--neutral); }
+.tag.orange { background: var(--orange); }
+.tag.mustard { background: var(--mustard); }
+.tag.green { background: var(--pine); color: #FFF; }
+.tag.outline { background: transparent; border: 1.5px solid var(--ink); padding: 3px 10px; }
+.note { padding: 14px; border-radius: 16px; background: var(--mustard-tint); }
+.claude { padding: 14px; border-radius: 16px; border: 1.5px dashed var(--pine); }
+.toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1.5px solid currentColor; border-radius: 22px; background: transparent; font-weight: 700; font-size: 14px; cursor: pointer; }
+.side .toggle { border: none; padding: 0; color: #FFF; }
+.switch { width: 32px; height: 18px; border-radius: 9px; background: var(--line); display: flex; align-items: center; padding: 2px; }
+.switch::after { content: ""; width: 14px; height: 14px; border-radius: 7px; background: #FFF; }
+.toggle[aria-pressed="true"] .switch { background: var(--pine); justify-content: flex-end; }
+dl.facts { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+dl.facts dt { font-size: 13px; color: var(--ink-2); }
+dl.facts dd { margin: 2px 0 0; font-weight: 700; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; }
+.stat .num { font-family: var(--display); font-weight: 800; font-size: 36px; line-height: 1; }
+.split { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 24px; }
+.split > .main-col { flex: 999 1 560px; min-width: 0; }
+.split > .side-col { flex: 1 1 320px; min-width: 0; position: sticky; top: 24px; }
+.table-box { overflow-x: auto; }
+table { width: 100%; min-width: 720px; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; color: var(--ink-2); font-size: 13px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+td { padding: 6px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+td.num, th.num { text-align: right; white-space: nowrap; }
+tr.selected { background: var(--bg); }
+.linkish { min-height: 44px; padding: 0; border: none; background: transparent; text-align: left; cursor: pointer; }
+input[type=text], input[type=search] { width: 100%; min-height: 52px; padding: 0 16px; border-radius: 26px; border: 1.5px solid var(--line); background: var(--surface); }
+ol.steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+ol.steps li { display: flex; gap: 12px; align-items: flex-start; }
+.step-n { flex: none; width: 30px; height: 30px; border-radius: 15px; background: var(--ink); color: #FFF; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+.progress { height: 8px; border-radius: 4px; background: var(--neutral); overflow: hidden; }
+.progress > div { height: 100%; background: var(--orange); }
+.actions3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.actions3 .btn { padding: 0 8px; gap: 6px; }
+dialog { border: none; border-radius: 24px; padding: 0; width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 32px); }
+dialog::backdrop { background: rgba(22, 32, 26, .45); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+@media (prefers-reduced-motion: no-preference) { .progress > div { transition: width .3s ease; } }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side" aria-label="Menú">
+    <span class="wordmark">mochila<span>.</span></span>
+    <nav aria-label="Secciones" id="side-nav"></nav>
+    <div class="foot" id="side-foot"></div>
+  </aside>
+  <main id="main" tabindex="-1"></main>
+  <nav class="bottom-nav" aria-label="Secciones" id="bottom-nav"></nav>
+</div>
+<dialog id="sheet" aria-label="Ficha de la skill"></dialog>
+<script type="application/json" id="data">__BACKPACK_DATA__</script>
+<script>
+"use strict";
+const D = JSON.parse(document.getElementById("data").textContent);
+const SK = new Map(D.skills.map(s => [s.id, s]));
+const PL = new Map(D.plugins.map(p => [p.id, p]));
+const RC = new Map(D.recipes.map(r => [r.id, r]));
+const fmt = n => Number(n).toLocaleString("es-CL");
+
+// --- storage: per-viewer marks; the page must work when it is unavailable
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("backpack." + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem("backpack." + k, JSON.stringify(v)); } catch (e) { /* private window */ } },
+};
+let marks = store.get("marks", {});           // key -> "remove" | "keep"; keys: skill id or "P:" + plugin id
+let advanced = store.get("advanced", matchMedia("(min-width: 900px)").matches);
+const saveMarks = () => store.set("marks", marks);
+
+// --- DOM helpers: strings always become text nodes, never markup
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? "" : String(v));
+  }
+  for (const kid of kids.flat(Infinity)) if (kid != null && kid !== false) el.append(kid instanceof Node ? kid : String(kid));
+  return el;
+}
+const ICONS = {
+  bag: ["M6 10a6 6 0 0 1 12 0v9a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z", "M9.5 4.5V3h5v1.5", "M9 15h6"],
+  book: ["M5 4h11a3 3 0 0 1 3 3v14H8a3 3 0 0 1-3-3z", "M5 18a3 3 0 0 1 3-3h11"],
+  target: ["M12 4a8 8 0 1 0 0 16a8 8 0 1 0 0-16", "M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6"],
+  history: ["M3.5 12a8.5 8.5 0 1 0 2.5-6", "M3 4v5h5", "M12 8v4l3 2"],
+  home: ["M4 11l8-7 8 7", "M6 10v10h12V10"],
+  copy: ["M8 8h12v12H8z", "M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"],
+  swap: ["M4 8h13l-3-3", "M20 16H7l3 3"],
+  arrow: ["M5 12h14", "M13 6l6 6-6 6"],
+  shield: ["M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"],
+  clock: ["M12 4a8 8 0 1 0 0 16a8 8 0 1 0 0-16", "M12 8v4l3 2"],
+  weight: ["M7 7h10l3 13H4z", "M9 7a3 3 0 0 1 6 0"],
+  x: ["M6 6l12 12", "M18 6L6 18"],
+  check: ["M5 12.5l4.5 4.5L19 7.5"],
+  chevron: ["M9 5l7 7-7 7"],
+  eye: ["M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z", "M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6"],
+};
+function icon(name, size = 20, color = "currentColor") {
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  for (const [k, v] of Object.entries({ width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: color,
+    "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": "true" })) svg.setAttribute(k, v);
+  for (const d of ICONS[name]) { const p = document.createElementNS(NS, "path"); p.setAttribute("d", d); svg.append(p); }
+  return svg;
+}
+function backpackArt() {
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("width", 84); svg.setAttribute("height", 98); svg.setAttribute("viewBox", "0 0 120 140"); svg.setAttribute("aria-hidden", "true");
+  const parts = [
+    ["path", { d: "M42 24V14a8 8 0 0 1 8-8h20a8 8 0 0 1 8 8v10", fill: "none", stroke: "#16201A", "stroke-width": 5, "stroke-linecap": "round" }],
+    ["rect", { x: 12, y: 24, width: 96, height: 110, rx: 32, fill: "#F2581D", stroke: "#16201A", "stroke-width": 5 }],
+    ["path", { d: "M14 60c28 14 64 14 92 0", fill: "none", stroke: "#16201A", "stroke-width": 4, "stroke-linecap": "round" }],
+    ["rect", { x: 34, y: 82, width: 52, height: 34, rx: 10, fill: "#E9B425", stroke: "#16201A", "stroke-width": 4 }],
+  ];
+  for (const [tag, at] of parts) { const el = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(at)) el.setAttribute(k, v); svg.append(el); }
+  return svg;
+}
+
+// --- derived facts
+const REC = { remove: "Quitar", review: "Revisar", merge: "Elegir una", tune: "Afinar", keep: "Conservar" };
+const MOTIVES = [  // first matching reason code names the row
+  ["security_high", "Seguridad", "orange"], ["exact_copy_extra", "Copia", "mustard"], ["unused", "Sin uso", "outline"],
+  ["same_name_variants", "Repetida", "mustard"], ["competes", "Compite", ""], ["greedy", "Se cuela", "orange"],
+  ["security_medium", "Seguridad", "mustard"], ["heavy_fixed", "Pesada", "outline"], ["heavy_body", "Pesada", "outline"],
+  ["disabled", "Desactivada", ""], ["exact_copy_keeper", "Tiene copias", ""],
+];
+function motive(s) { for (const [code, label, cls] of MOTIVES) if (s.codes.includes(code)) return [label, cls]; return ["Bien", "green"]; }
+function mainReason(s) { for (const [code] of MOTIVES) { const i = s.codes.indexOf(code); if (i >= 0) return i; } return 0; }
+const removable = s => s.rec === "remove" && s.codes.includes("unused");
+function plugOf(s) { return s.plugin ? PL.get(s.plugin) : null; }
+function markKey(s) { return s.plugin ? "P:" + s.plugin : s.id; }
+function markedRemoved(s) { return marks[markKey(s)] === "remove"; }
+function currentLoad() { return D.skills.reduce((t, s) => t + (markedRemoved(s) ? 0 : s.fixed), 0); }
+function lastUse(s) {
+  const u = s.usage;
+  if (!u) return "Sin datos aquí";
+  if (!u.count) return "Sin uso registrado";
+  return u.days_unused === 0 ? "Hoy" : `Hace ${fmt(u.days_unused)} días`;
+}
+const FILTERS = [
+  ["pendientes", "Para revisar", s => s.rec !== "keep"],
+  ["sin-uso", "Sin uso", s => s.codes.includes("unused") && s.rec === "remove"],
+  ["copias", "Repetidas", s => s.codes.includes("exact_copy_extra") || s.codes.includes("same_name_variants")],
+  ["compiten", "Compiten", s => s.codes.includes("competes")],
+  ["se-cuelan", "Se cuelan", s => s.codes.includes("greedy")],
+  ["pesadas", "Pesadas", s => s.codes.includes("heavy_fixed") || s.codes.includes("heavy_body")],
+  ["seguridad", "Seguridad", s => s.codes.some(c => c.startsWith("security_"))],
+  ["plugins", "Plugins", null],
+  ["todas", "Todas", () => true],
+];
+
+// --- shell
+const SECTIONS = [["inicio", "Inicio", "home"], ["revisar", "Revisar", "bag"], ["manual", "Manual", "book"], ["simulador", "Simulador", "target"], ["cambios", "Cambios", "history"]];
+function navLinks(current, bottom) {
+  return SECTIONS.map(([id, label, ic]) => h("a", { href: "#" + id, "aria-current": id === current ? "page" : null },
+    bottom ? h("span", { class: "pill" }, icon(ic, 22)) : icon(ic, 20), label));
+}
+function modeToggle() {
+  return h("button", { type: "button", class: "toggle", "aria-pressed": advanced, onclick: () => { advanced = !advanced; store.set("advanced", advanced); route(); } },
+    h("span", { class: "switch" }), advanced ? "Modo avanzado" : "Modo simple");
+}
+function topbar() { return h("div", { class: "topbar" }, h("span", { class: "wordmark" }, "mochila", h("span", null, ".")), modeToggle()); }
+
+// --- screens
+function screenHome() {
+  const t = D.totals, load = currentLoad();
+  const pick = f => D.skills.filter(f);
+  const unused = pick(s => s.codes.includes("unused") && s.rec === "remove");
+  const copies = pick(s => s.codes.includes("exact_copy_extra"));
+  const greedy = pick(s => s.codes.includes("greedy"));
+  const heavy = pick(s => s.codes.includes("heavy_fixed"));
+  const risky = pick(s => s.risk === "high");
+  const sum = list => list.reduce((n, s) => n + s.fixed, 0);
+  const row = (href, color, ic, title, sub, right, icColor = "#16201A") => h("a", { class: "row", href },
+    h("span", { class: "dot", style: `background:${color}` }, icon(ic, 20, icColor)),
+    h("span", { class: "grow" }, h("span", { class: "bold" }, title), h("span", { class: "small muted" }, sub)),
+    right ? h("span", { class: "small bold" }, right) : icon("chevron", 18, "#4C5A51"));
+  return [
+    topbar(),
+    h("h1", null, load > 10000 ? "Tu mochila pesa bastante." : "Tu mochila está liviana."),
+    h("section", { class: "card", "aria-label": "Carga actual", style: "display:flex;align-items:center;gap:12px" },
+      h("div", { class: "grow", style: "gap:6px" },
+        h("span", { class: "small muted" }, "Claude carga esto en cada conversación"),
+        h("span", { class: "big" }, fmt(load)),
+        h("span", { class: "bold" }, `tokens · ${fmt(t.skills)} skills`),
+        h("span", { class: "tiny muted" }, "Estimado. Pesa aunque nunca uses la skill.")),
+      backpackArt()),
+    t.savings ? h("p", { class: "note" }, `Si quitas lo sugerido, bajaría a ~${fmt(t.fixed_tokens_after_removals)} tokens (estimado).`) : null,
+    h("h2", null, "Dónde está el peso"),
+    h("div", { class: "stack" },
+      unused.length ? row("#revisar/sin-uso", "#F2581D", "clock", `${fmt(unused.length)} skills sin uso`,
+        t.usage_history_since ? `Ninguna se usó desde el ${t.usage_history_since}` : "No hay registro de uso", `~${fmt(sum(unused))} tk`) : null,
+      copies.length ? row("#revisar/copias", "#E9B425", "copy", `${fmt(copies.length)} copias exactas`, "La misma skill, instalada dos veces", `~${fmt(sum(copies))} tk`) : null,
+      D.competing.length ? row("#revisar/compiten", "#DCE3DC", "swap", `${fmt(D.competing.length)} pares que compiten`, "Hacen casi lo mismo con otro nombre") : null,
+      greedy.length ? row("#revisar/se-cuelan", "#F2581D", "arrow", `${fmt(greedy.length)} skills que se cuelan`, "Piden ir antes que todas") : null,
+      heavy.length ? row("#revisar/pesadas", "#DCE3DC", "weight", `${fmt(heavy.length)} con descripción pesada`, "Ocupan mucho en cada conversación", `~${fmt(sum(heavy))} tk`) : null,
+      row("#revisar/seguridad", "#2E6B4E", "shield", "Seguridad",
+        risky.length ? `${fmt(risky.length)} con algo serio para revisar` : "Nada serio en la revisión automática", null, "#FFFFFF")),
+    h("a", { class: "btn primary wide", href: "#revisar" }, "Empezar la revisión", icon("arrow", 20)),
+    h("p", { class: "tiny muted" }, D.disclaimer),
+  ];
+}
+
+// review queue for simple mode: plugins are removed whole, loose skills one by one
+function queue() {
+  const items = [];
+  for (const p of D.plugins) if (p.rec !== "keep") items.push({ kind: "plugin", id: p.id, rec: p.rec, fixed: p.fixed });
+  for (const s of D.skills) if (!s.plugin && s.rec !== "keep") items.push({ kind: "skill", id: s.id, rec: s.rec, fixed: s.fixed });
+  const order = { remove: 0, review: 1, merge: 2, tune: 3 };
+  items.sort((a, b) => order[a.rec] - order[b.rec] || b.fixed - a.fixed || a.id.localeCompare(b.id));
+  return items;
+}
+function screenReviewSimple() {
+  const all = queue();
+  const keyOf = it => it.kind === "plugin" ? "P:" + it.id : it.id;
+  const pending = all.filter(it => !marks[keyOf(it)]);
+  const done = all.length - pending.length;
+  const head = [topbar(), h("h1", null, "Revisión"),
+    h("div", { class: "progress", role: "progressbar", "aria-label": "Avance de la revisión", "aria-valuemin": 0, "aria-valuemax": all.length, "aria-valuenow": done },
+      h("div", { style: `width:${all.length ? (100 * done / all.length) : 100}%` })),
+    h("span", { class: "small muted" }, `${fmt(done)} de ${fmt(all.length)} revisadas`)];
+  if (!pending.length) return [...head, h("div", { class: "card stack" }, h("h2", null, "¡Listo!"),
+    h("p", null, "Revisaste todo lo sugerido. Mira el resumen en Cambios."), h("a", { class: "btn primary", href: "#cambios" }, "Ver cambios"))];
+  const it = pending[0], key = keyOf(it), load = currentLoad();
+  const decide = v => { marks[key] = v; saveMarks(); route(); };
+  const body = it.kind === "plugin" ? pluginCard(PL.get(it.id)) : skillCard(SK.get(it.id));
+  return [...head,
+    h("div", { class: "card", style: "display:flex;justify-content:space-between;align-items:baseline;gap:8px" },
+      h("span", { class: "small muted" }, "Carga si la quitas"),
+      h("span", null, h("s", { class: "muted" }, fmt(load)), " ", h("span", { class: "bold" }, fmt(load - it.fixed)), " tokens")),
+    h("article", { class: "card stack", style: "gap:14px" }, body),
+    h("div", { class: "actions3" },
+      h("button", { type: "button", class: "btn remove", onclick: () => decide("remove") }, icon("x", 18), "Quitar"),
+      it.kind === "skill" ? h("button", { type: "button", class: "btn", onclick: () => openSheet(it.id) }, icon("eye", 18), "Ficha")
+        : h("a", { class: "btn", href: "#revisar/plugins" }, icon("eye", 18), "Ver"),
+      h("button", { type: "button", class: "btn keep", onclick: () => decide("keep") }, icon("check", 18), "Conservar")),
+    h("p", { class: "tiny muted" }, "Nada se borra todavía: solo vas armando tu lista en Cambios."),
+  ];
+}
+function tags(s) {
+  const [label, cls] = motive(s);
+  return h("div", { class: "wrap", style: "gap:8px" }, h("span", { class: `tag ${cls}` }, label), h("span", { class: "tag outline" }, s.origin));
+}
+function skillCard(s) {
+  return [
+    tags(s),
+    h("div", { class: "stack", style: "gap:6px" }, h("h2", { class: "mono", style: "font-size:22px;overflow-wrap:anywhere" }, s.command),
+      h("p", null, s.card.what)),
+    s.reasons.length ? h("p", { class: "note" }, s.reasons[mainReason(s)]) : null,
+    h("dl", { class: "facts" },
+      h("div", null, h("dt", null, "Peso fijo"), h("dd", null, `~${fmt(s.fixed)} tokens`)),
+      h("div", null, h("dt", null, "Al activarse"), h("dd", null, `~${fmt(s.body)} tokens`)),
+      h("div", null, h("dt", null, "Último uso"), h("dd", null, lastUse(s))),
+      h("div", null, h("dt", null, "Sugerencia"), h("dd", null, REC[s.rec]))),
+    plugOf(s) ? h("p", { class: "small muted" }, `Es parte del plugin ${plugOf(s).name}: se quita el plugin completo.`) : null,
+  ];
+}
+function pluginCard(p) {
+  const n = p.skills.length;
+  return [
+    h("div", { class: "wrap", style: "gap:8px" }, h("span", { class: `tag ${p.light}` }, REC[p.rec]), h("span", { class: "tag outline" }, p.origin)),
+    h("div", { class: "stack", style: "gap:6px" }, h("h2", { class: "mono", style: "font-size:22px" }, p.name),
+      h("p", null, `Plugin con ${fmt(n)} ${n === 1 ? "skill" : "skills"}.`)),
+    p.reasons.map(r => h("p", { class: "note" }, r)),
+    h("dl", { class: "facts" },
+      h("div", null, h("dt", null, "Peso fijo"), h("dd", null, `~${fmt(p.fixed)} tokens`)),
+      h("div", null, h("dt", null, "Skills"), h("dd", null, fmt(n)))),
+    h("p", { class: "small muted" }, p.skills.slice(0, 12).map(id => SK.get(id).name).join(", ") + (n > 12 ? "…" : "")),
+  ];
+}
+
+let selected = null, shown = 150;
+const WIDE = () => matchMedia("(min-width: 1280px)").matches;  // room for table + side card
+function screenReviewTable(filterId) {
+  const f = FILTERS.find(x => x[0] === filterId) || FILTERS[0];
+  const t = D.totals;
+  const chips = h("div", { class: "wrap", style: "gap:6px" }, FILTERS.map(([id, label]) =>
+    h("button", { type: "button", class: "chip", "aria-pressed": id === f[0], onclick: () => { shown = 150; location.hash = "#revisar/" + id; } }, label)));
+  const header = h("div", { class: "wrap", style: "justify-content:space-between;align-items:flex-end" },
+    h("div", { class: "stack", style: "gap:6px" }, h("span", { class: "small muted bold" }, `Revisión · ${fmt(t.skills)} skills instaladas`),
+      h("h1", null, currentLoad() > 10000 ? "Tu mochila pesa bastante." : "Tu mochila está liviana.")),
+    h("div", { class: "wrap desk-hide" }, modeToggle()));
+  const stats = h("div", { class: "stats" },
+    h("div", { class: "card stat" }, h("div", { class: "num" }, fmt(currentLoad())), h("div", { class: "bold" }, "tokens fijos"), h("div", { class: "small muted" }, "por conversación, estimado")),
+    h("div", { class: "card stat" }, h("div", { class: "num" }, fmt(t.skills)), h("div", { class: "bold" }, "skills instaladas"), h("div", { class: "small muted" }, "en todas las carpetas")),
+    h("div", { class: "card stat" }, h("div", { class: "num" }, fmt(t.unused_skills)), h("div", { class: "bold" }, "sin uso registrado"),
+      h("div", { class: "small muted" }, t.usage_history_since ? `desde el ${t.usage_history_since}` : "sin datos de uso")),
+    h("div", { class: "card stat" }, h("div", { class: "num" }, `~${fmt(t.savings)}`), h("div", { class: "bold" }, "tokens que puedes liberar"), h("div", { class: "small muted" }, "con lo sugerido, estimado")));
+  let table;
+  if (f[0] === "plugins") {
+    const rows = [...D.plugins].sort((a, b) => b.fixed - a.fixed);
+    table = h("table", null, h("thead", null, h("tr", null, h("th", null, "Plugin"), h("th", null, "Origen"), h("th", { class: "num" }, "Skills"), h("th", { class: "num" }, "Peso fijo"), h("th", null, "Sugerencia"), h("th", null, "Tu decisión"))),
+      h("tbody", null, rows.map(p => h("tr", null,
+        h("td", { class: "mono" }, p.name), h("td", { class: "muted" }, p.origin), h("td", { class: "num" }, fmt(p.skills.length)),
+        h("td", { class: "num" }, `~${fmt(p.fixed)}`), h("td", { class: "bold" }, REC[p.rec], p.reasons.length ? h("div", { class: "tiny muted", style: "font-weight:400" }, p.reasons[0]) : null),
+        h("td", null, decisionButtons("P:" + p.id))))));
+  } else {
+    const rows = D.skills.filter(f[2]).sort((a, b) => b.fixed - a.fixed || a.id.localeCompare(b.id));
+    table = [h("table", null, h("thead", null, h("tr", null, h("th", null, "Skill"), h("th", null, "Motivo"), h("th", null, "Origen"), h("th", { class: "num" }, "Peso fijo"), h("th", { class: "num" }, "Al activarse"), h("th", null, "Último uso"), h("th", null, "Sugerencia"))),
+      h("tbody", null, rows.slice(0, shown).map(s => {
+        const [label, cls] = motive(s);
+        return h("tr", { class: s.id === selected ? "selected" : null },
+          h("td", null, h("button", { type: "button", class: "linkish mono", "aria-pressed": s.id === selected, onclick: () => selectSkill(s.id) }, s.command)),
+          h("td", null, h("span", { class: `tag ${cls}` }, label)), h("td", { class: "muted" }, s.origin),
+          h("td", { class: "num" }, `~${fmt(s.fixed)}`), h("td", { class: "num" }, `~${fmt(s.body)}`),
+          h("td", { class: "muted" }, lastUse(s)), h("td", { class: "bold" }, markedRemoved(s) ? "Marcada para quitar" : REC[s.rec]));
+      }))),
+      h("span", { class: "tiny muted" }, `Mostrando ${fmt(Math.min(shown, rows.length))} de ${fmt(rows.length)} · cifras en tokens, estimadas`),
+      rows.length > shown ? h("button", { type: "button", class: "btn", onclick: () => { shown += 150; route(); } }, "Mostrar más") : null];
+  }
+  const sel = selected && SK.get(selected);
+  return [
+    header, stats,
+    h("div", { class: "split" },
+      h("section", { class: "card main-col stack", "aria-label": "Skills para revisar", style: "gap:14px" },
+        h("h2", null, f[1]), chips, h("div", { class: "table-box" }, table)),
+      sel && WIDE() ? h("aside", { class: "card side-col stack", "aria-label": "Ficha de la skill", style: "gap:14px" }, fullCard(sel)) : null),
+  ];
+}
+function selectSkill(id) {
+  selected = id;
+  if (WIDE()) route(); else openSheet(id);
+}
+function decisionButtons(key) {
+  const set = v => { if (marks[key] === v) delete marks[key]; else marks[key] = v; saveMarks(); route(); };
+  return h("div", { class: "wrap", style: "gap:6px" },
+    h("button", { type: "button", class: "chip", "aria-pressed": marks[key] === "remove", onclick: () => set("remove") }, "Quitar"),
+    h("button", { type: "button", class: "chip", "aria-pressed": marks[key] === "keep", onclick: () => set("keep") }, "Conservar"));
+}
+function fullCard(s) {
+  const c = s.card, key = markKey(s), p = plugOf(s);
+  const set = v => { marks[key] = v; saveMarks(); closeSheet(); route(); };
+  const recipes = c.recipes.map(id => RC.get(id)).filter(Boolean);
+  return [
+    skillCard(s),
+    s.reasons.length > 1 ? h("ul", { class: "small", style: "margin:0;padding-left:18px" }, s.reasons.filter((_, i) => i !== mainReason(s)).map(r => h("li", null, r))) : null,
+    h("div", { class: "stack", style: "gap:4px" }, h("h3", null, "Cómo se activa"), h("p", { class: "small" }, c.activation),
+      c.how_to_call ? h("p", { class: "small" }, "Para llamarla: ", h("span", { class: "mono" }, c.how_to_call)) : null),
+    s.triggers ? h("div", { class: "stack", style: "gap:4px" }, h("h3", null, "Cuándo la usa Claude"), h("p", { class: "small" }, s.triggers)) : null,
+    h("div", { class: "stack", style: "gap:4px" }, h("h3", null, "Necesita"),
+      c.needs.length ? h("div", { class: "wrap", style: "gap:6px" }, c.needs.map(n => h("span", { class: "tag" }, n))) : h("p", { class: "small muted" }, "Nada especial declarado.")),
+    h("div", { class: "stack", style: "gap:4px" }, h("h3", null, "Cuándo no usarla"), h("p", { class: "small" }, c.when_not || "Sin datos aquí: su autor no lo dice.")),
+    h("div", { class: "stack", style: "gap:4px" }, h("h3", null, "Seguridad"), h("p", { class: "small" }, c.risk)),
+    h("p", { class: "small muted" }, c.usage, " ", c.weight),
+    recipes.length ? h("div", { class: "stack", style: "gap:4px" }, h("h3", null, "Aparece en recetas"),
+      recipes.map(r => h("a", { href: "#manual/" + encodeURIComponent(r.id), class: "small", onclick: closeSheet }, r.steps.map(id => SK.get(id).command).join(" → ")))) : null,
+    c.claude_note ? h("div", { class: "claude" }, h("span", { class: "tiny bold muted" }, "Explicación de Claude"), h("p", { class: "small" }, c.claude_note)) : null,
+    h("details", { class: "small" }, h("summary", null, "Descripción original (texto de la skill)"), h("p", { class: "muted", style: "margin-top:6px;overflow-wrap:anywhere" }, s.description || "Sin descripción.")),
+    h("div", { class: "wrap" },
+      h("button", { type: "button", class: "btn remove", style: "flex:1 1 140px", onclick: () => set("remove") }, icon("x", 18), p ? `Quitar el plugin ${p.name}` : "Quitar"),
+      h("button", { type: "button", class: "btn keep", style: "flex:1 1 140px", onclick: () => set("keep") }, icon("check", 18), "Conservar")),
+  ];
+}
+const sheet = document.getElementById("sheet");
+function openSheet(id) {
+  const s = SK.get(id);
+  sheet.replaceChildren(h("div", { class: "stack", style: "gap:14px;padding:24px" },
+    h("div", { style: "display:flex;justify-content:flex-end" }, h("button", { type: "button", class: "btn", "aria-label": "Cerrar", onclick: closeSheet }, icon("x", 18))),
+    fullCard(s)));
+  if (!sheet.open) sheet.showModal();
+}
+function closeSheet() { if (sheet.open) sheet.close(); }
+
+// --- word matching shared by the simulator and the manual search (rules only, no model)
+const STOP = new Set([...D.stopwords, ..."quiero necesito ayuda ayúdame favor hacer haz antes después algo todo todos nuestro nueva nuevo puedes podrías dame hazme".split(" ")]);
+const stem = w => w.length > 5 ? w.slice(0, 5) : w;
+const words = text => new Set(((text || "").toLowerCase().match(/[a-záéíóúñü0-9]+/g) || []).filter(w => w.length > 2 && !STOP.has(w)).map(stem));
+// most skill descriptions are in English and requests in Spanish: a small fixed dictionary bridges common words
+// ponytail: hand-made list keyed by 5-letter stems; grow it from requests that find nothing
+const ES_EN = {
+  revis: "review check audit", códig: "code", error: "bug error debug", falla: "bug failure", fallo: "bug failure",
+  proba: "test testing", prueb: "test testing", resum: "summary summarize", reuni: "meeting", corre: "email mail inbox",
+  diseñ: "design", prese: "presentation slides deck", cálcu: "spreadsheet excel", plani: "plan planning spreadsheet",
+  datos: "data", venta: "sales deal", clien: "customer client", contr: "contract hiring", factu: "invoice billing",
+  pago: "payment", pagos: "payment", mes: "month", cerra: "close closing", cierr: "close closing", infor: "report",
+  págin: "page website web", aplic: "app application", segur: "security", busca: "search find", tradu: "translate",
+  escri: "write writing", crear: "create build generate", crea: "create build generate", subir: "push upload deploy", publi: "publish deploy",
+  despl: "deploy", anali: "analyze analysis", análi: "analyze analysis", gráfi: "chart graph", table: "dashboard",
+  panel: "dashboard", tarea: "task todo", campa: "campaign", conte: "content", socia: "social", anima: "animation animate",
+  estil: "style", fuent: "font", texto: "text copy", memor: "memory", agent: "agent", habil: "skill",
+  insta: "install setup", confi: "config configure setup", depur: "debug", optim: "optimize performance",
+  rendi: "performance", acces: "accessibility", idiom: "language i18n", conta: "accounting bookkeeping",
+  impue: "tax", nómin: "payroll", entre: "interview", emple: "employee", produ: "product", inven: "inventory",
+  pedid: "order", tiend: "store shop", preci: "price pricing", llama: "call", calen: "calendar schedule",
+  agend: "calendar schedule", docum: "document docs", image: "image", imagen: "image",
+};
+const BAG = new Map(D.skills.map(s => [s.id, words([s.name.replace(/-/g, " "), s.description, s.triggers].join(" "))]));
+function matchSkills(query, only) {
+  // each word of the request counts once, matched by itself or by its translation
+  const groups = [...words(query)].map(w => [w, ...(ES_EN[w] ? words(ES_EN[w]) : [])]);
+  if (!groups.length) return [];
+  const out = [];
+  for (const s of D.skills) {
+    if (only && !only(s)) continue;
+    const bag = BAG.get(s.id);
+    const m = groups.filter(g => g.some(w => bag.has(w))).length;
+    const ratio = m / groups.length;
+    if (m && (groups.length < 3 ? ratio === 1 : m >= 2)) out.push({ s, m, ratio });
+  }
+  return out.sort((a, b) => b.m - a.m || b.ratio - a.ratio || a.s.id.localeCompare(b.s.id));
+}
+
+let simQuery = "";
+function screenSimulator() {
+  const input = h("input", { id: "pedido", type: "text", value: simQuery, placeholder: "Ej.: revisa mi código antes de subirlo", autocomplete: "off" });
+  const run = () => { simQuery = input.value; route(); };
+  input.addEventListener("keydown", e => { if (e.key === "Enter") run(); });
+  const hits = simQuery ? matchSkills(simQuery, s => s.invocable).slice(0, 8) : [];
+  let result = null;
+  if (simQuery) {
+    const n = hits.length;
+    result = [
+      h("div", { class: "stack", style: "gap:4px" }, h("span", { class: "small muted bold" }, "Predicción, no garantía"),
+        h("h2", null, n === 0 ? "Ninguna skill parece responder" : n === 1 ? "1 skill responde a este pedido" : `${n} skills compiten por este pedido`)),
+      n ? h("ol", { class: "stack", style: "margin:0;padding:0;list-style:none" }, hits.map(({ s, ratio }) =>
+        h("li", null, h("button", { type: "button", class: "row", onclick: () => openSheet(s.id) },
+          h("span", { class: "grow" }, h("span", { class: "mono", style: "overflow-wrap:anywhere" }, s.command), h("span", { class: "small muted" }, s.origin)),
+          h("span", { class: `tag ${ratio >= 0.6 ? "orange" : "mustard"}` }, ratio >= 0.6 ? "Alta" : "Media"))))) : null,
+      h("p", { class: "note" }, n === 0 ? "Claude respondería sin usar ninguna skill. Prueba con otras palabras."
+        : n === 1 ? "Solo una skill encaja: no hay choque." : `Quédate con una para esto. Mientras haya ${n}, van a competir cada vez que lo pidas.`),
+    ];
+  }
+  return [topbar(), h("h1", null, "¿Quién responde?"),
+    h("p", { class: "muted" }, "Escribe algo que le pedirías a Claude y mira qué skill se activaría."),
+    h("div", { class: "stack" }, h("label", { for: "pedido", class: "bold small" }, "Tu pedido"),
+      h("div", { style: "display:flex;gap:8px" }, input, h("button", { type: "button", class: "btn primary", onclick: run }, "Probar"))),
+    result];
+}
+
+let manualQuery = "";
+function recipeCard(r) {
+  const steps = r.steps.map(id => SK.get(id));
+  const needs = [...new Set(steps.flatMap(s => s.card.needs))];
+  const whenNot = steps.map(s => s.card.when_not).find(Boolean);
+  const how = steps[0].card.how_to_call;
+  const copy = h("button", { type: "button", class: "btn", onclick: () => copyText(how, copy) }, "Copiar");
+  return h("article", { class: "card stack", style: "gap:14px" },
+    h("div", { class: "stack", style: "gap:4px" }, h("span", { class: "tag mustard", style: "align-self:flex-start" }, "Receta"), h("h2", null, `Con ${steps[0].command}`)),
+    h("ol", { class: "steps" }, steps.map((s, i) => h("li", null, h("span", { class: "step-n" }, String(i + 1)),
+      h("span", { class: "grow" }, h("button", { type: "button", class: "linkish mono", style: "min-height:0", onclick: () => openSheet(s.id) }, s.command), h("span", { class: "small muted" }, s.card.what))))),
+    h("div", { class: "note", style: "display:flex;align-items:center;justify-content:space-between;gap:12px" },
+      h("span", { class: "grow" }, h("span", { class: "tiny bold muted" }, "Cómo pedirlo"), h("span", { class: "mono" }, how)), copy),
+    h("div", { class: "stack", style: "gap:4px" }, h("h3", null, "Necesita"),
+      needs.length ? h("div", { class: "wrap", style: "gap:6px" }, needs.map(n => h("span", { class: "tag" }, n))) : h("p", { class: "small muted" }, "Nada especial declarado.")),
+    h("div", { class: "stack", style: "gap:4px" }, h("h3", null, "Cuándo no usarla"), h("p", { class: "small" }, whenNot || "Sin datos aquí: sus autores no lo dicen.")));
+}
+function screenManual(focus) {
+  const input = h("input", { id: "buscar", type: "search", value: manualQuery, placeholder: "Ej.: cerrar el mes", autocomplete: "off" });
+  input.addEventListener("input", () => { manualQuery = input.value; clearTimeout(input._t); input._t = setTimeout(() => { route(); const el = document.getElementById("buscar"); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }, 250); });
+  const focused = focus && RC.get(decodeURIComponent(focus));
+  let body;
+  if (focused) body = [recipeCard(focused)];
+  else if (manualQuery.trim()) {
+    const hits = matchSkills(manualQuery);
+    const score = new Map(hits.map(x => [x.s.id, x.m]));
+    const recipes = D.recipes.map(r => [r, r.steps.reduce((t, id) => t + (score.get(id) || 0), 0)]).filter(x => x[1] > 0)
+      .sort((a, b) => b[1] - a[1]).slice(0, 5).map(x => x[0]);
+    body = [h("span", { class: "small muted bold" }, `${recipes.length} ${recipes.length === 1 ? "receta" : "recetas"} · ${hits.length} skills`),
+      recipes.map(recipeCard),
+      hits.length ? h("h2", null, "Skills") : null,
+      h("div", { class: "stack" }, hits.slice(0, 15).map(({ s }) => h("button", { type: "button", class: "row", onclick: () => openSheet(s.id) },
+        h("span", { class: "grow" }, h("span", { class: "mono", style: "overflow-wrap:anywhere" }, s.command), h("span", { class: "small muted" }, s.card.what)),
+        icon("chevron", 18, "#4C5A51"))))];
+  } else {
+    body = [h("p", { class: "muted" }, `Tienes ${fmt(D.recipes.length)} recetas: skills que se llaman entre sí. Busca por lo que quieres lograr.`),
+      D.recipes.slice(0, 20).map(r => h("a", { class: "row", href: "#manual/" + encodeURIComponent(r.id) },
+        h("span", { class: "grow" }, h("span", { class: "mono small", style: "overflow-wrap:anywhere" }, r.steps.map(id => SK.get(id).command).join(" → "))),
+        icon("chevron", 18, "#4C5A51")))];
+  }
+  return [topbar(), h("h1", null, "Manual"),
+    h("div", { class: "stack" }, h("label", { for: "buscar", class: "bold small" }, "¿Qué quieres hacer?"), input),
+    focused ? h("a", { href: "#manual", class: "small bold" }, "← Todas las recetas") : null, body];
+}
+
+function screenChanges() {
+  const remove = [], keep = [];
+  for (const [key, v] of Object.entries(marks)) {
+    const item = key.startsWith("P:") ? PL.get(key.slice(2)) : SK.get(key);
+    if (!item) continue;
+    (v === "remove" ? remove : keep).push({ key, label: key.startsWith("P:") ? `Plugin ${item.name}` : item.command, origin: item.origin, fixed: item.fixed });
+  }
+  remove.sort((a, b) => b.fixed - a.fixed);
+  const freed = remove.reduce((t, x) => t + x.fixed, 0);
+  const undo = key => { delete marks[key]; saveMarks(); route(); };
+  const list = items => h("div", { class: "stack" }, items.map(x => h("div", { class: "row" },
+    h("span", { class: "grow" }, h("span", { class: "mono", style: "overflow-wrap:anywhere" }, x.label), h("span", { class: "small muted" }, `${x.origin} · ~${fmt(x.fixed)} tokens fijos`)),
+    h("button", { type: "button", class: "chip", onclick: () => undo(x.key) }, "Deshacer"))));
+  const text = remove.length ? "Quiero quitar estas skills y plugins:\n" + remove.map(x => `- ${x.label} (${x.origin})`).join("\n") : "";
+  const copy = h("button", { type: "button", class: "btn primary", onclick: () => copyText(text, copy) }, icon("copy", 18), "Copiar la lista para Claude");
+  return [topbar(), h("h1", null, "Cambios"),
+    h("p", { class: "note" }, "Todavía no se borra nada. Esta es tu lista; en el próximo paso te mostraremos cómo desinstalar cada cosa según su origen."),
+    h("section", { class: "card stack", "aria-label": "Para quitar" }, h("h2", null, `Para quitar (${fmt(remove.length)})`),
+      remove.length ? [h("p", { class: "bold" }, `Liberarías ~${fmt(freed)} tokens en cada conversación (estimado).`), list(remove), h("div", { class: "wrap" }, copy)]
+        : h("p", { class: "muted" }, "Aún no marcaste nada para quitar.")),
+    h("section", { class: "card stack", "aria-label": "Para conservar" }, h("h2", null, `Para conservar (${fmt(keep.length)})`),
+      keep.length ? list(keep) : h("p", { class: "muted" }, "Aún no marcaste nada para conservar.")),
+    Object.keys(marks).length ? h("button", { type: "button", class: "btn", onclick: () => { if (confirm("¿Borrar todas tus marcas?")) { marks = {}; saveMarks(); route(); } } }, "Empezar de cero") : null];
+}
+
+function copyText(text, button) {
+  const done = () => { const old = button.textContent; button.textContent = "Copiado"; setTimeout(() => { button.textContent = old; }, 1500); };
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, () => fallback());
+  else fallback();
+  function fallback() {
+    const area = h("textarea", { class: "sr" }); area.value = text; document.body.append(area); area.select();
+    try { document.execCommand("copy"); done(); } catch (e) { /* user can still select the text */ }
+    area.remove();
+  }
+}
+
+// --- router
+function route() {
+  const [name, arg] = (location.hash.slice(1) || "inicio").split("/");
+  const current = SECTIONS.some(s => s[0] === name) ? name : "inicio";
+  let view;
+  if (current === "revisar") view = (advanced || arg) ? screenReviewTable(arg) : screenReviewSimple();
+  else if (current === "manual") view = screenManual(arg);
+  else if (current === "simulador") view = screenSimulator();
+  else if (current === "cambios") view = screenChanges();
+  else view = screenHome();
+  document.getElementById("main").replaceChildren(...[view].flat(Infinity).filter(Boolean));
+  document.getElementById("side-nav").replaceChildren(...navLinks(current, false));
+  document.getElementById("bottom-nav").replaceChildren(...navLinks(current, true));
+  document.getElementById("side-foot").replaceChildren(modeToggle(), h("span", null, "Cifras estimadas. Se cargan aunque nunca uses la skill."));
+}
+let lastRoute = "";
+addEventListener("hashchange", () => { const r = location.hash.split("/")[0]; if (r !== lastRoute) { window.scrollTo(0, 0); lastRoute = r; } route(); });
+sheet.addEventListener("close", () => sheet.replaceChildren());
+route();
+</script>
+</body>
+</html>

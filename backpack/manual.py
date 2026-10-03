@@ -9,6 +9,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .audit import _n
 from .inventory import MAX_READ, fs_path, split_frontmatter
 
 SCHEMA_VERSION = 1
@@ -162,7 +163,7 @@ def build_manual(inventory, scan, audit):
             "needs": _needs(s, plugin_rules),
             "when_not": _when_not(s["description"] + " " + (s.get("when_to_use") or "")),
             "usage": _usage(a.get("usage"), since),
-            "weight": f"Ocupa ~{t['fixed']} tokens en cada conversación y ~{t['body']} cuando se activa (estimado).",
+            "weight": f"Ocupa ~{_n(t['fixed'])} tokens en cada conversación y ~{_n(t['body'])} cuando se activa (estimado).",
             "risk": _risk(scan.get("skills", {}).get(sid), rules),
             "light": a["light"],
             "recommendation": a["recommendation"],
