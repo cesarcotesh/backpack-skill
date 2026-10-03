@@ -45,7 +45,9 @@ RULES = {
     "R11": ("medium", "Enlace a otro lugar",
             "Trae un enlace que apunta a otra parte de tu equipo. No se siguió."),
     "R12": ("medium", "Arranca programas al abrir Claude",
-            "El plugin pone en marcha programas o se conecta a servicios cada vez que abres Claude Code."),
+            "El plugin pone en marcha programas en tu equipo cada vez que abres Claude."),
+    "R13": ("low", "Se conecta a servicios",
+            "El plugin conecta Claude con servicios en internet. No corre programas en tu equipo."),
 }
 
 # Plugin components that run things on their own (Claude Code docs: plugins-reference)
@@ -133,7 +135,9 @@ class _Scan:
         if component:
             run_lines = [(no, line) for no, line in enumerate(lines, 1) if _RUN_LINE.search(line)]
             for no, line in run_lines or [(1, lines[0] if lines else "")]:
-                self.add(component, rel, no, line)
+                # a server reached by URL runs nothing locally (R13); hooks keep R08 either way
+                remote = component == "R12" and '"url"' in line and '"command"' not in line
+                self.add("R13" if remote else component, rel, no, line)
         if rel == ".claude-plugin/plugin.json":
             for no, line in enumerate(lines, 1):
                 m = _MANIFEST_KEY.match(line)
